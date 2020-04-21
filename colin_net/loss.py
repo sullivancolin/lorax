@@ -15,4 +15,4 @@ def mean_sqaured_error(model: NeuralNet, inputs: Tensor, actual: Tensor) -> floa
 
 def cross_entropy_loss(model: NeuralNet, inputs: Tensor, actual: Tensor) -> float:
     predicted = model(inputs)
-    return -np.sum(actual * np.log(predicted) + (1 - actual) * np.log(1 - predicted))
+    return -actual * np.log(predicted) - (1 - actual) * np.log(1 - predicted)

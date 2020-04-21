@@ -6,7 +6,7 @@ a neural net might look like
 
 inputs -> Linear -> Tanh -> Linear -> output
 """
-from typing import Tuple, Any, Iterable
+from typing import Tuple, Any, Iterable, List
 from jax import jit
 from jax.tree_util import register_pytree_node_class
 import jax.numpy as np
@@ -23,7 +23,7 @@ class Layer:
     def __call__(self, inputs: Tensor) -> Tensor:
         raise NotImplementedError
 
-    def tree_flatten(self) -> Tuple[Iterable[Any], str]:
+    def tree_flatten(self) -> Tuple[Iterable[Any], Any]:
         raise NotImplementedError
 
     @classmethod
@@ -55,7 +55,7 @@ class Linear(Layer):
         return inputs @ self.w + self.b
 
     def tree_flatten(self) -> LinearFlattened:
-        return ((self.w, self.b), "Linear")
+        return ((self.w, self.b), None)
 
     @classmethod
     def tree_unflatten(cls, aux: Any, params: LinearTuple) -> "Linear":
@@ -70,8 +70,8 @@ class Tanh(Layer):
     def __call__(self, inputs: Tensor) -> Tensor:
         return np.tanh(inputs)
 
-    def tree_flatten(self) -> Tuple[Tuple[None], str]:
-        return ((None,), "Tanh")
+    def tree_flatten(self) -> Tuple[List[None], None]:
+        return ([None], None)
 
     @classmethod
     def tree_unflatten(cls, aux: Any, data: Iterable[Any]) -> "Tanh":
@@ -87,8 +87,8 @@ class Relu(Layer):
 
         return jax.nn.relu(inputs)
 
-    def tree_flatten(self) -> Tuple[Tuple[None], str]:
-        return ((None,), "Relu")
+    def tree_flatten(self) -> Tuple[List[None], None]:
+        return ([None], None)
 
     @classmethod
     def tree_unflatten(cls, aux: Any, data: Iterable[Any]) -> "Relu":
@@ -104,8 +104,8 @@ class LeakyRelu(Layer):
 
         return jax.nn.leaky_relu(inputs)
 
-    def tree_flatten(self) -> Tuple[Tuple[None], str]:
-        return ((None,), "LeakyRelu")
+    def tree_flatten(self) -> Tuple[List[None], None]:
+        return ([None], None)
 
     @classmethod
     def tree_unflatten(cls, aux: Any, data: Iterable[Any]) -> "LeakyRelu":
@@ -121,8 +121,8 @@ class Sigmoid(Layer):
 
         return jax.nn.sigmoid(inputs)
 
-    def tree_flatten(self) -> Tuple[Tuple[None], str]:
-        return ((None,), "Sigmoid")
+    def tree_flatten(self) -> Tuple[List[None], None]:
+        return ([None], None)
 
     @classmethod
     def tree_unflatten(cls, aux: Any, data: Iterable[Any]) -> "Sigmoid":
@@ -138,19 +138,9 @@ class Softmax(Layer):
 
         return jax.nn.softmax(inputs)
 
-    def tree_flatten(self) -> Tuple[Tuple[None], str]:
-        return ((None,), "Softmax")
+    def tree_flatten(self) -> Tuple[List[None], None]:
+        return ([None], None)
 
     @classmethod
     def tree_unflatten(cls, aux: Any, data: Iterable[Any]) -> "Softmax":
         return cls()
-
-
-layer_lookup = {
-    "Linear": Linear,
-    "Tanh": Tanh,
-    "Relu": Relu,
-    "LeakyRelu": LeakyRelu,
-    "Sigmoid": Sigmoid,
-    "Softmax": Softmax,
-}
