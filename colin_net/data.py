@@ -2,11 +2,10 @@
 We'll feed inputs into our network in batches.
 So here are some tools for iterating over data in batches.
 """
-from typing import Iterator
 from dataclasses import dataclass
+from typing import Iterator
 
 import numpy as np
-import numpy.random as npr
 
 from colin_net.tensor import Tensor
 
@@ -39,7 +38,7 @@ class BatchIterator(DataIterator):
     def __iter__(self) -> Iterator[Batch]:
         starts = np.arange(0, len(self.inputs), self.batch_size)
         if self.shuffle:
-            npr.shuffle(starts)
+            np.random.shuffle(starts)
 
         for start in starts:
             end = start + self.batch_size

@@ -11,10 +11,11 @@ from typing import List
 
 import numpy as np
 
-from joelnet.train import train
-from joelnet.nn import NeuralNet
 from joelnet.layers import Linear, Tanh
+from joelnet.nn import NeuralNet
 from joelnet.optim import SGD
+from joelnet.train import train
+
 
 def fizz_buzz_encode(x: int) -> List[int]:
     if x % 15 == 0:

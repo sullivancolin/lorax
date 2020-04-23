@@ -6,13 +6,15 @@ a neural net might look like
 
 inputs -> Linear -> Tanh -> Linear -> output
 """
-from typing import Tuple, Any, Iterable, List
-from jax import jit
-from jax.tree_util import register_pytree_node_class
-import jax.numpy as np
-import jax
-from colin_net.tensor import Tensor
+from typing import Any, Iterable, List, Tuple
 
+import jax
+import jax.numpy as np
+from jax import jit
+from jax.random import PRNGKey
+from jax.tree_util import register_pytree_node_class
+
+from colin_net.tensor import Tensor
 
 LinearTuple = Tuple[Tensor, Tensor]
 
@@ -29,6 +31,15 @@ class Layer:
     @classmethod
     def tree_unflatten(cls, aux: Any, params: Iterable[Any]):
         raise NotImplementedError
+
+
+class ActivationLayer(Layer):
+    def tree_flatten(self) -> Tuple[List[None], None]:
+        return ([None], None)
+
+    @classmethod
+    def tree_unflatten(cls, aux: Any, data: Iterable[Any]) -> "ActivationLayer":
+        return cls()
 
 
 @register_pytree_node_class
@@ -50,9 +61,17 @@ class Linear(Layer):
     @jit
     def __call__(self, inputs: Tensor) -> Tensor:
         """
-        outputs = inputs @ w + b
+        outputs = w @ inputs + b
         """
-        return inputs @ self.w + self.b
+        # print(inputs.shape, self.w)
+        return np.dot(self.w, inputs) + self.b
+
+    @classmethod
+    def initialize(cls, *, input_size: int, output_size: int, key: PRNGKey) -> "Linear":
+        return cls(
+            w=jax.random.normal(key, shape=(output_size, input_size)),
+            b=jax.random.normal(key, shape=(output_size,)),
+        )
 
     def tree_flatten(self) -> LinearFlattened:
         return ((self.w, self.b), None)
@@ -63,84 +82,34 @@ class Linear(Layer):
 
 
 @register_pytree_node_class
-class Tanh(Layer):
-    def __init__(self):
-        pass
-
+class Tanh(ActivationLayer):
     def __call__(self, inputs: Tensor) -> Tensor:
         return np.tanh(inputs)
 
-    def tree_flatten(self) -> Tuple[List[None], None]:
-        return ([None], None)
-
-    @classmethod
-    def tree_unflatten(cls, aux: Any, data: Iterable[Any]) -> "Tanh":
-        return cls()
-
 
 @register_pytree_node_class
-class Relu(Layer):
-    def __init__(self):
-        pass
-
+class Relu(ActivationLayer):
     def __call__(self, inputs: Tensor) -> Tensor:
 
         return jax.nn.relu(inputs)
 
-    def tree_flatten(self) -> Tuple[List[None], None]:
-        return ([None], None)
-
-    @classmethod
-    def tree_unflatten(cls, aux: Any, data: Iterable[Any]) -> "Relu":
-        return cls()
-
 
 @register_pytree_node_class
-class LeakyRelu(Layer):
-    def __init__(self):
-        pass
-
+class LeakyRelu(ActivationLayer):
     def __call__(self, inputs: Tensor) -> Tensor:
 
         return jax.nn.leaky_relu(inputs)
 
-    def tree_flatten(self) -> Tuple[List[None], None]:
-        return ([None], None)
-
-    @classmethod
-    def tree_unflatten(cls, aux: Any, data: Iterable[Any]) -> "LeakyRelu":
-        return cls()
-
 
 @register_pytree_node_class
-class Sigmoid(Layer):
-    def __init__(self):
-        pass
-
+class Sigmoid(ActivationLayer):
     def __call__(self, inputs: Tensor) -> Tensor:
 
         return jax.nn.sigmoid(inputs)
 
-    def tree_flatten(self) -> Tuple[List[None], None]:
-        return ([None], None)
-
-    @classmethod
-    def tree_unflatten(cls, aux: Any, data: Iterable[Any]) -> "Sigmoid":
-        return cls()
-
 
 @register_pytree_node_class
-class Softmax(Layer):
-    def __init__(self):
-        pass
-
+class Softmax(ActivationLayer):
     def __call__(self, inputs: Tensor) -> Tensor:
 
         return jax.nn.softmax(inputs)
-
-    def tree_flatten(self) -> Tuple[List[None], None]:
-        return ([None], None)
-
-    @classmethod
-    def tree_unflatten(cls, aux: Any, data: Iterable[Any]) -> "Softmax":
-        return cls()
