@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[4]:
+# In[ ]:
 
 
 """
@@ -12,14 +12,15 @@ import jax.numpy as np
 import jax.random as jxr
 import numpy as onp
 import plotly.graph_objects as go
-from jax.tree_util import tree_flatten
 from tqdm.autonotebook import tqdm
+from jax.tree_util import tree_flatten
 
 from colin_net.data import BatchIterator
 from colin_net.layers import Linear, Softmax, Tanh
 from colin_net.loss import mean_sqaured_error
 from colin_net.nn import NeuralNet
 from colin_net.train import train
+
 
 # Create Input Data and True Labels
 inputs = onp.array([[0, 0], [1, 0], [0, 1], [1, 1]])
@@ -53,13 +54,13 @@ def accuracy(actual, predicted):
 
 # Start training process
 
-num_epochs = 100
+num_epochs = 500
 progress = train(
     net,
     num_epochs=num_epochs,
     iterator=iterator,
     loss=mean_sqaured_error,
-    lr=1.
+    lr=1.0
 )
 
 points = []
@@ -113,3 +114,7 @@ print(tree_flatten(net)[0])
 
 
 # In[ ]:
+
+
+
+

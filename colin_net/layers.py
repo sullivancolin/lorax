@@ -8,9 +8,8 @@ inputs -> Linear -> Tanh -> Linear -> output
 """
 from typing import Any, Iterable, List, Tuple
 
-import jax
 import jax.numpy as np
-from jax import jit
+from jax import jit, random, nn
 from jax.random import PRNGKey
 from jax.tree_util import register_pytree_node_class
 
@@ -69,8 +68,8 @@ class Linear(Layer):
     @classmethod
     def initialize(cls, *, input_size: int, output_size: int, key: PRNGKey) -> "Linear":
         return cls(
-            w=jax.random.normal(key, shape=(output_size, input_size)),
-            b=jax.random.normal(key, shape=(output_size,)),
+            w=random.normal(key, shape=(output_size, input_size)),
+            b=random.normal(key, shape=(output_size,)),
         )
 
     def tree_flatten(self) -> LinearFlattened:
@@ -91,25 +90,25 @@ class Tanh(ActivationLayer):
 class Relu(ActivationLayer):
     def __call__(self, inputs: Tensor) -> Tensor:
 
-        return jax.nn.relu(inputs)
+        return nn.relu(inputs)
 
 
 @register_pytree_node_class
 class LeakyRelu(ActivationLayer):
     def __call__(self, inputs: Tensor) -> Tensor:
 
-        return jax.nn.leaky_relu(inputs)
+        return nn.leaky_relu(inputs)
 
 
 @register_pytree_node_class
 class Sigmoid(ActivationLayer):
     def __call__(self, inputs: Tensor) -> Tensor:
 
-        return jax.nn.sigmoid(inputs)
+        return nn.sigmoid(inputs)
 
 
 @register_pytree_node_class
 class Softmax(ActivationLayer):
     def __call__(self, inputs: Tensor) -> Tensor:
 
-        return jax.nn.softmax(inputs)
+        return nn.softmax(inputs)
