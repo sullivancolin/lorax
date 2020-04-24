@@ -13,7 +13,6 @@ import jax.random as jxr
 import numpy as onp
 import plotly.graph_objects as go
 from tqdm.autonotebook import tqdm
-from jax.tree_util import tree_flatten
 
 from colin_net.data import BatchIterator
 from colin_net.layers import Linear, Softmax, Tanh
@@ -56,16 +55,12 @@ def accuracy(actual, predicted):
 
 num_epochs = 500
 progress = train(
-    net,
-    num_epochs=num_epochs,
-    iterator=iterator,
-    loss=mean_sqaured_error,
-    lr=1.0
+    net, num_epochs=num_epochs, iterator=iterator, loss=mean_sqaured_error, lr=1.0
 )
 
 points = []
 for i, (epoch, loss, net) in enumerate(tqdm(progress, total=num_epochs)):
-    
+
     # check loss and accuracy every 5 epochs
     if i % 5 == 0:
         print(epoch, loss)
@@ -104,17 +99,3 @@ layout = go.Layout(
 fig = go.Figure(data=trace, layout=layout)
 
 fig.show()
-
-
-# net.batched_predict(np.array([[0, 0], [1, 1]]))
-
-
-print(tree_flatten(net)[0])
-
-
-
-# In[ ]:
-
-
-
-
