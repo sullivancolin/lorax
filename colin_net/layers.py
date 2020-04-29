@@ -1,7 +1,6 @@
 """
 Our neural nets will be made up of layers.
-Each layer needs to pass its inputs forward
-and propagate gradients backward. For example,
+Each layer needs to pass its inputs forward. For example,
 a neural net might look like
 
 inputs -> Linear -> Tanh -> Linear -> output
@@ -9,7 +8,7 @@ inputs -> Linear -> Tanh -> Linear -> output
 from typing import Any, Iterable, List, Tuple
 
 import jax.numpy as np
-from jax import jit, random, nn
+from jax import jit, nn, random
 from jax.random import PRNGKey
 from jax.tree_util import register_pytree_node_class
 
@@ -40,6 +39,9 @@ class ActivationLayer(Layer):
     def tree_unflatten(cls, aux: Any, data: Iterable[Any]) -> "ActivationLayer":
         return cls()
 
+    def __repr__(self) -> str:
+        return f"<ActivationLayer {self.__class__.__name__}>"
+
 
 @register_pytree_node_class
 class Linear(Layer):
@@ -60,13 +62,13 @@ class Linear(Layer):
     @jit
     def __call__(self, inputs: Tensor) -> Tensor:
         """
-        outputs = w @ inputs + b
+        outputs = np.dot(w, inputs) + b
         """
-        # print(inputs.shape, self.w)
         return np.dot(self.w, inputs) + self.b
 
     @classmethod
     def initialize(cls, *, input_size: int, output_size: int, key: PRNGKey) -> "Linear":
+        """Factory for new Linear from input and out put dimentsions"""
         return cls(
             w=random.normal(key, shape=(output_size, input_size)),
             b=random.normal(key, shape=(output_size,)),

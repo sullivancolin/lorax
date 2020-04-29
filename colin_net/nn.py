@@ -1,7 +1,6 @@
 """
 A NeuralNet is just a collection of layers.
-It behaves a lot like a layer itself, although
-we're not going to make it one.
+It behaves a lot like a layer itself.
 """
 from typing import Any, Iterable, Sequence, Tuple
 
@@ -19,7 +18,7 @@ class NeuralNet(Layer):
 
     @jit
     def predict(self, inputs: Tensor) -> Tensor:
-        """Predict for a single instance"""
+        """Predict for a single instance by iterting over all the layers"""
         for layer in self.layers:
             inputs = layer(inputs)
         return inputs

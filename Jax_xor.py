@@ -1,9 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[ ]:
-
-
 """
 The canonical example of a function that can't be
 learned with a simple linear model is XOR
@@ -12,19 +6,19 @@ import jax.numpy as np
 import jax.random as jxr
 import numpy as onp
 import plotly.graph_objects as go
+from jax import nn
 from tqdm.autonotebook import tqdm
 
 from colin_net.data import BatchIterator
-from colin_net.layers import Linear, Softmax, Tanh
+from colin_net.layers import Linear, Tanh
 from colin_net.loss import mean_sqaured_error
 from colin_net.nn import NeuralNet
 from colin_net.train import train
 
-
 # Create Input Data and True Labels
 inputs = onp.array([[0, 0], [1, 0], [0, 1], [1, 1]])
 
-targets = onp.array([[0, 1], [1, 0], [1, 0], [0, 1]])
+targets = onp.array([[1, 0], [0, 1], [0, 1], [1, 0]])
 
 
 # Generate seed for Reproducible Random Numbers
@@ -34,13 +28,11 @@ key = jxr.PRNGKey(42)
 # Create NeuralNet Instance
 net = NeuralNet(
     [
-        Linear.initialize(input_size=2, output_size=3, key=key),
+        Linear.initialize(input_size=2, output_size=2, key=key),
         Tanh(),
-        Linear.initialize(input_size=3, output_size=2, key=key),
-        Softmax(),
+        Linear.initialize(input_size=2, output_size=2, key=key),
     ]
 )
-
 
 # Create an iterator over the input data
 iterator = BatchIterator(inputs, targets)
@@ -53,7 +45,7 @@ def accuracy(actual, predicted):
 
 # Start training process
 
-num_epochs = 500
+num_epochs = 5000
 progress = train(
     net, num_epochs=num_epochs, iterator=iterator, loss=mean_sqaured_error, lr=1.0
 )
@@ -61,12 +53,13 @@ progress = train(
 points = []
 for i, (epoch, loss, net) in enumerate(tqdm(progress, total=num_epochs)):
 
-    # check loss and accuracy every 5 epochs
-    if i % 5 == 0:
+    # checks accuracy every 50 epochs
+    if i % 50 == 0:
         print(epoch, loss)
         predicted = net(inputs)
-
-        if accuracy(targets, predicted) >= 0.99:
+        acc_metric = accuracy(targets, predicted)
+        print(f"Accuracy: {acc_metric}")
+        if acc_metric >= 0.99:
             print("Achieved Perfect Prediction!")
             points.append([epoch, loss])
             break
@@ -74,10 +67,12 @@ for i, (epoch, loss, net) in enumerate(tqdm(progress, total=num_epochs)):
 
 
 # Display Predictions
-predicted = net(inputs)
-print(targets, predicted, np.argmax(predicted, axis=1))
+probabilties = nn.softmax(net(inputs))
+for gold, prob, pred in zip(targets, probabilties, np.argmax(probabilties, axis=1)):
 
-print("Accuracy: ", accuracy(targets, predicted))
+    print(gold, prob, pred)
+
+print("Accuracy: ", accuracy(targets, probabilties))
 
 
 # Plott Loss Curve
@@ -91,11 +86,13 @@ trace = [
 
 
 layout = go.Layout(
-    title="Train Loss Over Time",
+    title="Xor Train Loss Over Time",
     xaxis=dict(title="Number of updates"),
     yaxis=dict(title="Loss"),
+    width=600,
+    height=500,
 )
 
 fig = go.Figure(data=trace, layout=layout)
 
-fig.show()
+fig.write_html("xor_loss_curve.html")

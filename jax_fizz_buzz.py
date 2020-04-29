@@ -1,9 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[10]:
-
-
 """
 FizzBuzz is the following problem:
 
@@ -17,16 +11,18 @@ from typing import List
 
 import jax.numpy as np
 import jax.random as jxr
-import numpy as onp
+import plotly.graph_objects as go
+from jax import nn
 from tqdm.autonotebook import tqdm
 
 from colin_net.data import BatchIterator
-from colin_net.layers import Linear, Softmax, Tanh
-from colin_net.loss import mean_sqaured_error
+from colin_net.layers import Linear, Tanh, Relu
+from colin_net.loss import mean_sqaured_error, cross_entropy_loss
 from colin_net.nn import NeuralNet
 from colin_net.train import train
 
 key = jxr.PRNGKey(42)
+
 
 def fizz_buzz_encode(x: int) -> List[int]:
     if x % 15 == 0:
@@ -45,22 +41,18 @@ def binary_encode(x: int) -> List[int]:
     """
     return [x >> i & 1 for i in range(10)]
 
-inputs = np.array([
-    binary_encode(x)
-    for x in range(101, 1024)
-])
 
-targets = np.array([
-    fizz_buzz_encode(x)
-    for x in range(101, 1024)
-])
+inputs = np.array([binary_encode(x) for x in range(101, 1024)])
 
-net = NeuralNet([
-    Linear.initialize(input_size=10, output_size=50, key=key),
-    Tanh(),
-    Linear.initialize(input_size=50, output_size=4, key=key),
-    Softmax()
-])
+targets = np.array([fizz_buzz_encode(x) for x in range(101, 1024)])
+
+net = NeuralNet(
+    [
+        Linear.initialize(input_size=10, output_size=50, key=key),
+        Tanh(),
+        Linear.initialize(input_size=50, output_size=4, key=key)
+    ]
+)
 
 iterator = BatchIterator(inputs=inputs, targets=targets)
 
@@ -70,43 +62,59 @@ def accuracy(actual, predicted):
     return np.mean(np.argmax(actual, axis=1) == np.argmax(predicted, axis=1))
 
 
-
 num_epochs = 5000
 
-progress = train(net,
-      loss=mean_sqaured_error,
-      iterator=iterator,
-      num_epochs=num_epochs,
-      lr=0.001)
+progress = train(
+    net, loss=mean_sqaured_error, iterator=iterator, num_epochs=num_epochs, lr=0.1
+)
 
 
 points = []
 for i, (epoch, loss, net) in enumerate(tqdm(progress, total=num_epochs)):
-    
-    # check loss and accuracy every 5 epochs
-    if i % 5 == 0:
-        print(epoch, loss)
-        predicted = net(inputs)
 
-        if accuracy(targets, predicted) >= 0.99:
-            print("Achieved Perfect Prediction!")
-            points.append([epoch, loss])
-            break
+    # check loss and accuracy every 100 epochs
+    if i % 100 == 0:
+        print(epoch, loss)
+        predicted = nn.softmax(net(inputs))
+        acc_metric = accuracy(targets, predicted)
+        print(f"Train Accuracy: {acc_metric}")
+
     points.append([epoch, loss])
 
 
 for x in range(1, 101):
-    predicted = net.predict(np.array(binary_encode(x)))
+    predicted = nn.softmax(net.predict(np.array(binary_encode(x))))
     predicted_idx = np.argmax(predicted)
-    actual_idx = np.argmax(fizz_buzz_encode(x))
+    actual_idx = np.argmax(np.array(fizz_buzz_encode(x)))
     labels = [str(x), "fizz", "buzz", "fizzbuzz"]
     print(x, labels[predicted_idx], labels[actual_idx])
 
 
-# In[17]:
+test_predictions = nn.softmax(net(np.array([binary_encode(x) for x in range(1, 101)])))
+test_labels = np.array([fizz_buzz_encode(x) for x in range(1, 101)])
+
+test_accuracy = accuracy(test_labels, test_predictions)
+
+print(f"Test Accuracy: {test_accuracy}")
+
+# Plott Loss Curve
+points_array = np.array(points)
+
+trace = [
+    go.Scattergl(
+        x=points_array[:, 0], y=points_array[:, 1], name="train loss", opacity=0.5
+    )
+]
 
 
-accuracy(targets, net(inputs))
+layout = go.Layout(
+    title="FizzBuzz Train Loss Over Time",
+    xaxis=dict(title="Number of updates"),
+    yaxis=dict(title="Loss"),
+    width=600,
+    height=500,
+)
 
+fig = go.Figure(data=trace, layout=layout)
 
-# In[ ]:
+fig.write_html("fizzbuzz_loss_curve.html")

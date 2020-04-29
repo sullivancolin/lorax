@@ -1,6 +1,9 @@
 """
 A loss function measures how good our predictions are,
-we can use this to adjust the parameters of our network
+we can use this to adjust the parameters of our network.
+
+Loss functions must take the net to be optimized as the first
+argument for taking the derivative with jax.grad
 """
 import jax.numpy as np
 

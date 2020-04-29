@@ -19,7 +19,8 @@ def train(
     loss: Loss,
     lr: float = 0.01,
 ) -> Iterator[Tuple[int, float, NeuralNet]]:
-    def update_combiner(param, grad, lr=lr):
+    def sgd_update_combiner(param, grad, lr=lr):
+        """Convenvience method for performing SGD on custom jax Pytree objects"""
         return param - (lr * grad)
 
     grad_fn = grad(loss)
@@ -30,6 +31,7 @@ def train(
 
             grads = grad_fn(net, batch.inputs, batch.targets)
 
-            net = tree_multimap(update_combiner, net, grads)
+            net = tree_multimap(sgd_update_combiner, net, grads)
 
+        # Must return net other as it has been reinstantiated, not mutated.
         yield (epoch, epoch_loss, net)
