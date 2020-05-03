@@ -5,18 +5,17 @@ from typing import Callable, Iterator, Tuple
 
 import jax.numpy as np
 from jax import grad, random, tree_multimap
-from jax.random import PRNGKey
 
 from colin_net.data import DataIterator
 from colin_net.nn import NeuralNet
 from colin_net.tensor import Tensor
 
-Loss = Callable[[NeuralNet, PRNGKey, Tensor, Tensor], float]
+Loss = Callable[[NeuralNet, Tensor, Tensor, Tensor], float]
 
 
 def train(
     net: NeuralNet,
-    key: PRNGKey,
+    key: Tensor,
     num_epochs: int,
     iterator: DataIterator,
     loss: Loss,

@@ -20,16 +20,23 @@ LinearFlattened = Tuple[LinearTuple, Any]
 
 
 class Mode(str, Enum):
+    """Allowed values for Dropout Mode"""
+
     train = "train"
     eval = "eval"
 
 
 class Layer(PyTreeLike, is_abstract=True):
+    """Abstract Class for Layers. Enforces subclasses to implement
+    __call__, tree_flatten, tree_unflatten and registered as Pytree"""
+
     def __call__(self, inputs: Tensor, **kwargs) -> Tensor:
         raise NotImplementedError
 
 
 class ActivationLayer(Layer, is_abstract=True):
+    """Abstract Class for Activation Layers."""
+
     def tree_flatten(self) -> Tuple[List[None], None]:
         return ([None], None)
 
@@ -42,9 +49,8 @@ class ActivationLayer(Layer, is_abstract=True):
 
 
 class Linear(Layer):
-    """
-    computes output = inputs @ w + b
-    """
+    """Dense Linear Layer.
+    Computes output = np.dot(w, inputs) + b"""
 
     def __init__(self, w: Tensor, b: Tensor) -> None:
         self.w = w
@@ -58,9 +64,8 @@ class Linear(Layer):
 
     @jit
     def __call__(self, inputs: Tensor, **kwargs) -> Tensor:
-        """
-        outputs = np.dot(w, inputs) + b
-        """
+        """outputs = np.dot(w, inputs) + b in single instance notation."""
+
         return np.dot(self.w, inputs) + self.b
 
     @classmethod
@@ -80,7 +85,10 @@ class Linear(Layer):
 
 
 class Dropout(Layer):
-    def __init__(self, keep: float = 0.8, mode: str = Mode.eval):
+    """Dropout Layer. If in train mode, keeps input activations at given probability rate,
+    otherwise returns inputs directly"""
+
+    def __init__(self, keep: float = 0.8, mode: str = Mode.train):
         self.keep = keep
         if mode not in Mode.__members__:
             raise ValueError(f"mode: {mode} not in {Mode.__members__.values()}")
@@ -88,6 +96,8 @@ class Dropout(Layer):
 
     @jit
     def __call__(self, inputs: Tensor, **kwargs) -> Tensor:
+        """If in train mode, keeps input activations at rate,
+        otherwise returns directly"""
 
         if self.mode == Mode.eval:
             return inputs

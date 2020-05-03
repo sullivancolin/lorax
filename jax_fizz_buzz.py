@@ -10,18 +10,16 @@ For each of the numbers 1 to 100:
 from typing import List
 
 import jax.numpy as np
-import jax.random as jxr
 import plotly.graph_objects as go
-from jax import nn
+from jax import random
 from tqdm.autonotebook import tqdm
 
 from colin_net.data import BatchIterator
-from colin_net.layers import Linear, Relu, Tanh
-from colin_net.loss import cross_entropy_loss, mean_sqaured_error
-from colin_net.nn import NeuralNet
+from colin_net.loss import mean_sqaured_error
+from colin_net.nn import FeedForwardNet
 from colin_net.train import train
 
-key = jxr.PRNGKey(42)
+key = random.PRNGKey(42)
 
 
 def fizz_buzz_encode(x: int) -> List[int]:
@@ -46,51 +44,58 @@ inputs = np.array([binary_encode(x) for x in range(101, 1024)])
 
 targets = np.array([fizz_buzz_encode(x) for x in range(101, 1024)])
 
-net = NeuralNet(
-    [
-        Linear.initialize(input_size=10, output_size=50, key=key),
-        Tanh(),
-        Linear.initialize(input_size=50, output_size=4, key=key),
-    ]
+net = FeedForwardNet.create_mlp(
+    input_dim=10, output_dim=4, hidden_dim=50, key=key, num_hidden=2, dropout_keep=0.8
 )
 
 iterator = BatchIterator(inputs=inputs, targets=targets)
 
 
 # define accuracy calculation
-def accuracy(actual, predicted):
+def accuracy(actual, predicted) -> float:
     return np.mean(np.argmax(actual, axis=1) == np.argmax(predicted, axis=1))
 
 
 num_epochs = 5000
 
 progress = train(
-    net, loss=mean_sqaured_error, iterator=iterator, num_epochs=num_epochs, lr=0.1
+    net,
+    key=key,
+    loss=mean_sqaured_error,
+    iterator=iterator,
+    num_epochs=num_epochs,
+    lr=0.1,
 )
-
 
 points = []
 for i, (epoch, loss, net) in enumerate(tqdm(progress, total=num_epochs)):
 
     # check loss and accuracy every 100 epochs
     if i % 100 == 0:
+        net.eval()
         print(epoch, loss)
-        predicted = nn.softmax(net(inputs))
+        keys = random.split(key, num=inputs.shape[0])
+        predicted = net.predict_proba(inputs, keys)
         acc_metric = accuracy(targets, predicted)
         print(f"Train Accuracy: {acc_metric}")
-
+        if acc_metric >= 0.99:
+            break
+        net.train()
     points.append([epoch, loss])
 
-
+net.eval()
+keys = random.split(key, num=inputs.shape[0])
 for x in range(1, 101):
-    predicted = nn.softmax(net.predict(np.array(binary_encode(x))))
+    predicted = net.predict_proba(np.array(binary_encode(x)), keys)
     predicted_idx = np.argmax(predicted)
     actual_idx = np.argmax(np.array(fizz_buzz_encode(x)))
     labels = [str(x), "fizz", "buzz", "fizzbuzz"]
     print(x, labels[predicted_idx], labels[actual_idx])
 
 
-test_predictions = nn.softmax(net(np.array([binary_encode(x) for x in range(1, 101)])))
+test_predictions = net.predict_proba(
+    np.array([binary_encode(x) for x in range(1, 101)])
+)
 test_labels = np.array([fizz_buzz_encode(x) for x in range(1, 101)])
 
 test_accuracy = accuracy(test_labels, test_predictions)
@@ -105,7 +110,6 @@ trace = [
         x=points_array[:, 0], y=points_array[:, 1], name="train loss", opacity=0.5
     )
 ]
-
 
 layout = go.Layout(
     title="FizzBuzz Train Loss Over Time",

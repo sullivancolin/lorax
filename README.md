@@ -13,3 +13,6 @@ Live Coding Video [Here](https://www.youtube.com/watch?v=o64FV-ez6Gw)
 * Plot Loss curves over time using Plotly
 * Turn `train` into generator for early stopping and show progress bar.
 * Jupyter Notebook and standalone scripts for both xor and fizzbuzz
+* Implemented Dropout Layer
+* Automatic Pytree class registration via inheritance
+*

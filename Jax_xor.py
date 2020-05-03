@@ -3,20 +3,19 @@ The canonical example of a function that can't be
 learned with a simple linear model is XOR
 """
 import jax.numpy as np
-import numpy as onp
 import plotly.graph_objects as go
 from jax import random
 from tqdm.autonotebook import tqdm
 
+from colin_net import FeedForwardNet
 from colin_net.data import BatchIterator
 from colin_net.loss import mean_sqaured_error
-from colin_net.nn import NeuralNet
 from colin_net.train import train
 
 # Create Input Data and True Labels
-inputs = onp.array([[0, 0], [1, 0], [0, 1], [1, 1]])
+inputs = np.array([[0, 0], [1, 0], [0, 1], [1, 1]])
 
-targets = onp.array([[1, 0], [0, 1], [0, 1], [1, 0]])
+targets = np.array([[1, 0], [0, 1], [0, 1], [1, 0]])
 
 
 # Generate seed for Reproducible Random Numbers
@@ -24,11 +23,9 @@ key = random.PRNGKey(42)
 
 
 # Create NeuralNet Instance
-net = NeuralNet.create(
+net = FeedForwardNet.create_mlp(
     input_dim=2, output_dim=2, hidding_dim=2, key=key, dropout_keep=1.0, num_hidden=2,
 )
-
-net.train()
 
 # Create an iterator over the input data
 iterator = BatchIterator(inputs, targets)

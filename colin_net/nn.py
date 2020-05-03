@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Any, Iterable, List, Tuple, Type, Union
 
 from jax import jit, nn, random, vmap
-from jax.random import PRNGKey
 
 from colin_net.layers import ActivationLayer, Dropout, Layer, Linear, Mode, Tanh
 from colin_net.tensor import Tensor
@@ -15,7 +14,17 @@ from colin_net.tensor import Tensor
 suffix = ".pkl"
 
 
-class NeuralNet(Layer):
+class NeuralNet(Layer, is_abstract=True):
+    """Abstract Class for NeuralNet. Enforces subclasses to implement
+    __call__, tree_flatten, tree_unflatten and registered as Pytree"""
+
+    def __call__(self, inputs: Tensor, **kwargs) -> Tensor:
+        raise NotImplementedError
+
+
+class FeedForwardNet(NeuralNet):
+    """Class for feed forward nets like Multilayer Perceptrons."""
+
     def __init__(self, layers: List[Layer], output_dim: int) -> None:
         self.layers = layers
         self.output_dim = output_dim
@@ -41,31 +50,28 @@ class NeuralNet(Layer):
             return nn.sigmoid(self.__call__(inputs, keys))
 
     @classmethod
-    def create(
+    def create_mlp(
         cls,
         input_dim: int,
-        hidding_dim: int,
+        hidden_dim: int,
         output_dim: int,
         num_hidden: int,
-        key: PRNGKey,
+        key: Tensor,
         activation: Type[ActivationLayer] = Tanh,
         dropout_keep: float = 0.8,
-    ) -> "NeuralNet":
-
+    ) -> "FeedForwardNet":
         key, subkey = random.split(key)
-        layers = [
-            Linear.initialize(
-                input_size=input_dim, output_size=hidding_dim, key=subkey
-            ),
+        layers: List[Layer] = [
+            Linear.initialize(input_size=input_dim, output_size=hidden_dim, key=subkey),
             activation(),
-            Dropout(keep=dropout_keep, mode="eval"),
+            Dropout(keep=dropout_keep),
         ]
 
         for i in range(num_hidden - 2):
             key, subkey = random.split(key)
             layers.append(
                 Linear.initialize(
-                    input_size=hidding_dim, output_size=hidding_dim, key=subkey
+                    input_size=hidden_dim, output_size=hidden_dim, key=subkey
                 )
             )
             layers.append(activation())
@@ -73,9 +79,7 @@ class NeuralNet(Layer):
 
         key, subkey = random.split(key)
         layers.append(
-            Linear.initialize(
-                input_size=hidding_dim, output_size=output_dim, key=subkey
-            )
+            Linear.initialize(input_size=hidden_dim, output_size=output_dim, key=subkey)
         )
         return cls(layers, output_dim)
 
@@ -94,7 +98,7 @@ class NeuralNet(Layer):
         layers = (
             "\n\t" + "\n\t".join([layer.__repr__() for layer in self.layers]) + "\n"
         )
-        return f"<NeuralNet layers={layers}>"
+        return f"<FeedForwardNet layers={layers}>"
 
     def save(self, path: Union[str, Path], overwrite: bool = False):
         path = Path(path)
@@ -110,7 +114,7 @@ class NeuralNet(Layer):
             pickle.dump(self, file)
 
     @classmethod
-    def load(cls, path: Union[str, Path]) -> "NeuralNet":
+    def load(cls, path: Union[str, Path]) -> "FeedForwardNet":
         path = Path(path)
         if not path.is_file():
             raise ValueError(f"Not a file: {path}")
@@ -124,6 +128,6 @@ class NeuralNet(Layer):
         return tuple(self.layers), self.output_dim
 
     @classmethod
-    def tree_unflatten(cls, aux: int, params: List[Layer]) -> "NeuralNet":
+    def tree_unflatten(cls, aux: int, params: List[Layer]) -> "FeedForwardNet":
 
         return cls(params, aux)

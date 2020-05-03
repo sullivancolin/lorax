@@ -1,9 +1,7 @@
 """
 Abstract Base class with automatic Pytree registration
-Taken from https://github.com/google/jax/issues/2916
+Inspired by from https://github.com/google/jax/issues/2916
 """
-
-
 from abc import abstractmethod
 
 from jax.tree_util import register_pytree_node
