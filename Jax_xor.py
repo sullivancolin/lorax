@@ -3,14 +3,12 @@ The canonical example of a function that can't be
 learned with a simple linear model is XOR
 """
 import jax.numpy as np
-import jax.random as jxr
 import numpy as onp
 import plotly.graph_objects as go
-from jax import nn
+from jax import random
 from tqdm.autonotebook import tqdm
 
 from colin_net.data import BatchIterator
-from colin_net.layers import Linear, Tanh
 from colin_net.loss import mean_sqaured_error
 from colin_net.nn import NeuralNet
 from colin_net.train import train
@@ -22,17 +20,15 @@ targets = onp.array([[1, 0], [0, 1], [0, 1], [1, 0]])
 
 
 # Generate seed for Reproducible Random Numbers
-key = jxr.PRNGKey(42)
+key = random.PRNGKey(42)
 
 
 # Create NeuralNet Instance
-net = NeuralNet(
-    [
-        Linear.initialize(input_size=2, output_size=2, key=key),
-        Tanh(),
-        Linear.initialize(input_size=2, output_size=2, key=key),
-    ]
+net = NeuralNet.create(
+    input_dim=2, output_dim=2, hidding_dim=2, key=key, dropout_keep=1.0, num_hidden=2,
 )
+
+net.train()
 
 # Create an iterator over the input data
 iterator = BatchIterator(inputs, targets)
@@ -47,7 +43,7 @@ def accuracy(actual, predicted):
 
 num_epochs = 5000
 progress = train(
-    net, num_epochs=num_epochs, iterator=iterator, loss=mean_sqaured_error, lr=1.0
+    net, key, num_epochs=num_epochs, iterator=iterator, loss=mean_sqaured_error, lr=0.1,
 )
 
 points = []
@@ -56,24 +52,28 @@ for i, (epoch, loss, net) in enumerate(tqdm(progress, total=num_epochs)):
     # checks accuracy every 50 epochs
     if i % 50 == 0:
         print(epoch, loss)
-        predicted = net(inputs)
+        net.eval()
+        keys = random.split(key, num=inputs.shape[0])
+        predicted = net.predict_proba(inputs, keys)
         acc_metric = accuracy(targets, predicted)
         print(f"Accuracy: {acc_metric}")
         if acc_metric >= 0.99:
             print("Achieved Perfect Prediction!")
             points.append([epoch, loss])
             break
+        net.train()
     points.append([epoch, loss])
 
+net.save("xor_model.pkl", overwrite=True)
 
 # Display Predictions
-probabilties = nn.softmax(net(inputs))
+keys = random.split(key, num=inputs.shape[0])
+probabilties = net.predict_proba(inputs, keys)
 for gold, prob, pred in zip(targets, probabilties, np.argmax(probabilties, axis=1)):
 
     print(gold, prob, pred)
 
 print("Accuracy: ", accuracy(targets, probabilties))
-
 
 # Plott Loss Curve
 points_array = np.array(points)
@@ -83,7 +83,6 @@ trace = [
         x=points_array[:, 0], y=points_array[:, 1], name="train loss", opacity=0.5
     )
 ]
-
 
 layout = go.Layout(
     title="Xor Train Loss Over Time",

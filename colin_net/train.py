@@ -3,17 +3,20 @@ Here's a function that can train a neural net
 """
 from typing import Callable, Iterator, Tuple
 
-from jax import grad, tree_multimap
+import jax.numpy as np
+from jax import grad, random, tree_multimap
+from jax.random import PRNGKey
 
 from colin_net.data import DataIterator
 from colin_net.nn import NeuralNet
 from colin_net.tensor import Tensor
 
-Loss = Callable[[NeuralNet, Tensor, Tensor], float]
+Loss = Callable[[NeuralNet, PRNGKey, Tensor, Tensor], float]
 
 
 def train(
     net: NeuralNet,
+    key: PRNGKey,
     num_epochs: int,
     iterator: DataIterator,
     loss: Loss,
@@ -27,9 +30,11 @@ def train(
     for epoch in range(num_epochs):
         epoch_loss = 0.0
         for batch in iterator:
-            epoch_loss += loss(net, batch.inputs, batch.targets)
+            num_keys = batch.inputs.shape[0]
+            key, *subkeys = random.split(key, num_keys + 1)
+            epoch_loss += loss(net, np.array(subkeys), batch.inputs, batch.targets)
 
-            grads = grad_fn(net, batch.inputs, batch.targets)
+            grads = grad_fn(net, np.array(subkeys), batch.inputs, batch.targets)
 
             net = tree_multimap(sgd_update_combiner, net, grads)
 

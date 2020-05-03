@@ -2,40 +2,128 @@
 A NeuralNet is just a collection of layers.
 It behaves a lot like a layer itself.
 """
-from typing import Any, Iterable, Sequence, Tuple
+import pickle
+from pathlib import Path
+from typing import Any, Iterable, List, Tuple, Type, Union
 
-from jax import jit, vmap
-from jax.tree_util import register_pytree_node_class
+from jax import jit, nn, random, vmap
+from jax.random import PRNGKey
 
-from colin_net.layers import Layer
+from colin_net.layers import ActivationLayer, Dropout, Layer, Linear, Mode, Tanh
 from colin_net.tensor import Tensor
 
+suffix = ".pkl"
 
-@register_pytree_node_class
+
 class NeuralNet(Layer):
-    def __init__(self, layers: Sequence[Layer]) -> None:
+    def __init__(self, layers: List[Layer], output_dim: int) -> None:
         self.layers = layers
+        self.output_dim = output_dim
 
     @jit
-    def predict(self, inputs: Tensor) -> Tensor:
+    def predict(self, inputs: Tensor, key: Tensor) -> Tensor:
         """Predict for a single instance by iterting over all the layers"""
         for layer in self.layers:
-            inputs = layer(inputs)
+            inputs = layer(inputs, key=key)
         return inputs
 
     @jit
-    def __call__(self, inputs: Tensor) -> Tensor:
+    def __call__(self, inputs: Tensor, keys: Tensor) -> Tensor:
         """Batched Predictions"""
 
-        return vmap(self.predict)(inputs)
+        return vmap(self.predict)(inputs, keys)
 
-    def __repr__(self) -> str:
-        return f"<NeuralNet layers={[layer.__repr__() for layer in self.layers]}"
-
-    def tree_flatten(self) -> Tuple[Iterable[Any], None]:
-        return tuple(self.layers), None
+    @jit
+    def predict_proba(self, inputs: Tensor, keys: Tensor) -> Tensor:
+        if self.output_dim > 1:
+            return nn.softmax(self.__call__(inputs, keys))
+        else:
+            return nn.sigmoid(self.__call__(inputs, keys))
 
     @classmethod
-    def tree_unflatten(cls, aux: Any, params: Sequence[Layer]) -> "NeuralNet":
+    def create(
+        cls,
+        input_dim: int,
+        hidding_dim: int,
+        output_dim: int,
+        num_hidden: int,
+        key: PRNGKey,
+        activation: Type[ActivationLayer] = Tanh,
+        dropout_keep: float = 0.8,
+    ) -> "NeuralNet":
 
-        return cls(params)
+        key, subkey = random.split(key)
+        layers = [
+            Linear.initialize(
+                input_size=input_dim, output_size=hidding_dim, key=subkey
+            ),
+            activation(),
+            Dropout(keep=dropout_keep, mode="eval"),
+        ]
+
+        for i in range(num_hidden - 2):
+            key, subkey = random.split(key)
+            layers.append(
+                Linear.initialize(
+                    input_size=hidding_dim, output_size=hidding_dim, key=subkey
+                )
+            )
+            layers.append(activation())
+            layers.append(Dropout(keep=dropout_keep))
+
+        key, subkey = random.split(key)
+        layers.append(
+            Linear.initialize(
+                input_size=hidding_dim, output_size=output_dim, key=subkey
+            )
+        )
+        return cls(layers, output_dim)
+
+    def eval(self) -> None:
+        for layer in self.layers:
+            if isinstance(layer, Dropout):
+                layer.mode = Mode.eval
+
+    def train(self) -> None:
+        for layer in self.layers:
+            if isinstance(layer, Dropout):
+                layer.mode = Mode.train
+
+    def __repr__(self) -> str:
+
+        layers = (
+            "\n\t" + "\n\t".join([layer.__repr__() for layer in self.layers]) + "\n"
+        )
+        return f"<NeuralNet layers={layers}>"
+
+    def save(self, path: Union[str, Path], overwrite: bool = False):
+        path = Path(path)
+        if path.suffix != suffix:
+            path = path.with_suffix(suffix)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if path.exists():
+            if overwrite:
+                path.unlink()
+            else:
+                raise RuntimeError(f"File {path} already exists.")
+        with open(path, "wb") as file:
+            pickle.dump(self, file)
+
+    @classmethod
+    def load(cls, path: Union[str, Path]) -> "NeuralNet":
+        path = Path(path)
+        if not path.is_file():
+            raise ValueError(f"Not a file: {path}")
+        if path.suffix != suffix:
+            raise ValueError(f"Not a {suffix} file: {path}")
+        with open(path, "rb") as file:
+            data = pickle.load(file)
+        return data
+
+    def tree_flatten(self) -> Tuple[Iterable[Any], int]:
+        return tuple(self.layers), self.output_dim
+
+    @classmethod
+    def tree_unflatten(cls, aux: int, params: List[Layer]) -> "NeuralNet":
+
+        return cls(params, aux)

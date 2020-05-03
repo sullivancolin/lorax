@@ -16,8 +16,8 @@ from jax import nn
 from tqdm.autonotebook import tqdm
 
 from colin_net.data import BatchIterator
-from colin_net.layers import Linear, Tanh, Relu
-from colin_net.loss import mean_sqaured_error, cross_entropy_loss
+from colin_net.layers import Linear, Relu, Tanh
+from colin_net.loss import cross_entropy_loss, mean_sqaured_error
 from colin_net.nn import NeuralNet
 from colin_net.train import train
 
@@ -50,7 +50,7 @@ net = NeuralNet(
     [
         Linear.initialize(input_size=10, output_size=50, key=key),
         Tanh(),
-        Linear.initialize(input_size=50, output_size=4, key=key)
+        Linear.initialize(input_size=50, output_size=4, key=key),
     ]
 )
 
