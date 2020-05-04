@@ -124,8 +124,8 @@ class FeedForwardNet(NeuralNet):
             data = pickle.load(file)
         return data
 
-    def tree_flatten(self) -> Tuple[Iterable[Any], int]:
-        return tuple(self.layers), self.output_dim
+    def tree_flatten(self) -> Tuple[List[Layer], int]:
+        return self.layers, self.output_dim
 
     @classmethod
     def tree_unflatten(cls, aux: int, params: List[Layer]) -> "FeedForwardNet":
