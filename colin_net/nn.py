@@ -4,11 +4,12 @@ It behaves a lot like a layer itself.
 """
 import pickle
 from pathlib import Path
-from typing import Any, Iterable, List, Tuple, Type, Union
+from typing import List, Tuple, Type, Union
 
 from jax import jit, nn, random, vmap
 
-from colin_net.layers import ActivationLayer, Dropout, Layer, Linear, Mode, Tanh
+from colin_net.layers import (ActivationLayer, Dropout, Layer, Linear, Mode,
+                              Tanh)
 from colin_net.tensor import Tensor
 
 suffix = ".pkl"
@@ -31,7 +32,7 @@ class FeedForwardNet(NeuralNet):
 
     @jit
     def predict(self, inputs: Tensor, key: Tensor) -> Tensor:
-        """Predict for a single instance by iterting over all the layers"""
+        """Predict for a single instance by iterating over all the layers"""
         for layer in self.layers:
             inputs = layer(inputs, key=key)
         return inputs
