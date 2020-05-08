@@ -6,11 +6,13 @@ Loss functions must take the net to be optimized as the first
 argument for taking the derivative with jax.grad
 """
 import jax.numpy as np
+from jax import jit
 
 from colin_net.nn import NeuralNet
 from colin_net.tensor import Tensor
 
 
+@jit
 def mean_sqaured_error(
     model: NeuralNet, keys: Tensor, inputs: Tensor, actual: Tensor
 ) -> float:
@@ -19,6 +21,7 @@ def mean_sqaured_error(
     return np.mean((predicted - actual) ** 2)
 
 
+@jit
 def cross_entropy_loss(
     model: NeuralNet, keys: Tensor, inputs: Tensor, actual: Tensor
 ) -> float:
