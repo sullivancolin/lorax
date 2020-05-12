@@ -16,8 +16,6 @@ from colin_net.tensor import Tensor
 
 LinearTuple = Tuple[Tensor, Tensor]
 
-LinearFlattened = Tuple[LinearTuple, Any]
-
 
 class Mode(str, Enum):
     """Allowed values for Dropout Mode"""
@@ -26,12 +24,28 @@ class Mode(str, Enum):
     eval = "eval"
 
 
+INITIALIZERS = {
+    "normal": nn.initializers.normal(stddev=1.0),
+    "glorot_normal": nn.initializers.glorot_normal(),
+    "lecun_normal": nn.initializers.lecun_normal(),
+}
+
+
+class Initializer(str, Enum):
+    normal = "normal"
+    glorot_normal = "glorot_normal"
+    lecun_normal = "lecun_normal"
+
+
 class Layer(PyTreeLike, is_abstract=True):
     """Abstract Class for Layers. Enforces subclasses to implement
     __call__, tree_flatten, tree_unflatten and registered as Pytree"""
 
     def __call__(self, inputs: Tensor, **kwargs) -> Tensor:
         raise NotImplementedError
+
+    def __str__(self):
+        return self.__repr__()
 
 
 class ActivationLayer(Layer, is_abstract=True):
@@ -56,11 +70,8 @@ class Linear(Layer):
         self.w = w
         self.b = b
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<LinearLayer w={self.w.shape}, b={self.b.shape}>"
-
-    def __str__(self):
-        return self.__repr__()
 
     @jit
     def __call__(self, inputs: Tensor, **kwargs) -> Tensor:
@@ -69,14 +80,25 @@ class Linear(Layer):
         return np.dot(self.w, inputs) + self.b
 
     @classmethod
-    def initialize(cls, *, input_size: int, output_size: int, key: Tensor) -> "Linear":
+    def initialize(
+        cls,
+        *,
+        input_size: int,
+        output_size: int,
+        key: Tensor,
+        initializer: str = Initializer.normal,
+    ) -> "Linear":
         """Factory for new Linear from input and output dimentsions"""
+        if initializer not in Initializer.__members__:
+            raise ValueError(
+                f"initializer: {initializer} not in {Initializer.__members__.values()}"
+            )
         return cls(
-            w=random.normal(key, shape=(output_size, input_size)),
+            w=INITIALIZERS[initializer](key, shape=(output_size, input_size)),
             b=np.zeros(shape=(output_size,)),
         )
 
-    def tree_flatten(self) -> LinearFlattened:
+    def tree_flatten(self) -> Tuple[LinearTuple, None]:
         return ((self.w, self.b), None)
 
     @classmethod
@@ -88,7 +110,7 @@ class Dropout(Layer):
     """Dropout Layer. If in train mode, keeps input activations at given probability rate,
     otherwise returns inputs directly"""
 
-    def __init__(self, keep: float = 0.8, mode: str = Mode.train):
+    def __init__(self, keep: float = 0.5, mode: str = Mode.train) -> None:
         self.keep = keep
         if mode not in Mode.__members__:
             raise ValueError(f"mode: {mode} not in {Mode.__members__.values()}")
@@ -117,9 +139,6 @@ class Dropout(Layer):
     def __repr__(self):
         return f"<Dropout keep={self.keep}, mode={self.mode}>"
 
-    def __str__(self):
-        return self.__repr__()
-
     def tree_flatten(self) -> Tuple[List[None], Tuple[float, str]]:
         return ([None], (self.keep, self.mode))
 
@@ -129,29 +148,36 @@ class Dropout(Layer):
 
 
 class Tanh(ActivationLayer):
+    @jit
     def __call__(self, inputs: Tensor, **kwargs) -> Tensor:
         return np.tanh(inputs)
 
 
 class Relu(ActivationLayer):
+    @jit
     def __call__(self, inputs: Tensor, **kwargs) -> Tensor:
-
         return nn.relu(inputs)
 
 
 class LeakyRelu(ActivationLayer):
+    @jit
     def __call__(self, inputs: Tensor, **kwargs) -> Tensor:
-
         return nn.leaky_relu(inputs)
 
 
-class Sigmoid(ActivationLayer):
+class Selu(ActivationLayer):
+    @jit
     def __call__(self, inputs: Tensor, **kwargs) -> Tensor:
+        return nn.selu(inputs)
 
+
+class Sigmoid(ActivationLayer):
+    @jit
+    def __call__(self, inputs: Tensor, **kwargs) -> Tensor:
         return nn.sigmoid(inputs)
 
 
 class Softmax(ActivationLayer):
+    @jit
     def __call__(self, inputs: Tensor, **kwargs) -> Tensor:
-
         return nn.softmax(inputs)

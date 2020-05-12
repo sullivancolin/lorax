@@ -44,8 +44,11 @@ inputs = np.array([binary_encode(x) for x in range(101, 1024)])
 
 targets = np.array([fizz_buzz_encode(x) for x in range(101, 1024)])
 
+test_X = np.array([binary_encode(x) for x in range(1, 101)])
+test_y = np.array([fizz_buzz_encode(x) for x in range(1, 101)])
+
 net = FeedForwardNet.create_mlp(
-    input_dim=10, output_dim=4, hidden_dim=50, key=key, num_hidden=2, dropout_keep=0.8
+    input_dim=10, output_dim=4, hidden_dim=50, key=key, num_hidden=2, dropout_keep=None,
 )
 
 iterator = BatchIterator(inputs=inputs, targets=targets)
@@ -68,6 +71,7 @@ progress = train(
 )
 
 points = []
+eval_points = []
 for i, (epoch, loss, net) in enumerate(tqdm(progress, total=num_epochs)):
 
     # check loss and accuracy every 100 epochs
@@ -77,28 +81,28 @@ for i, (epoch, loss, net) in enumerate(tqdm(progress, total=num_epochs)):
         keys = random.split(key, num=inputs.shape[0])
         predicted = net.predict_proba(inputs, keys)
         acc_metric = accuracy(targets, predicted)
+        test_predicted = net.predict_proba(test_X, keys[: len(test_X)])
+        test_acc = accuracy(test_y, test_predicted)
         print(f"Train Accuracy: {acc_metric}")
+        print(f"Test Accuracy: {test_acc}")
         if acc_metric >= 0.99:
             break
         net.train()
+
     points.append([epoch, loss])
+    net.eval()
+    eval_loss = mean_sqaured_error(net, keys[: len(test_X)], test_X, test_y)
+    net.train()
+    eval_points.append(eval_loss)
 
 net.eval()
-keys = random.split(key, num=inputs.shape[0])
-for x in range(1, 101):
-    predicted = net.predict_proba(np.array(binary_encode(x)), keys)
-    predicted_idx = np.argmax(predicted)
-    actual_idx = np.argmax(np.array(fizz_buzz_encode(x)))
-    labels = [str(x), "fizz", "buzz", "fizzbuzz"]
-    print(x, labels[predicted_idx], labels[actual_idx])
 
+net.save("jax_fizz_buzz.pkl", overwrite=True)
+keys = random.split(key, num=test_X.shape[0])
 
-test_predictions = net.predict_proba(
-    np.array([binary_encode(x) for x in range(1, 101)])
-)
-test_labels = np.array([fizz_buzz_encode(x) for x in range(1, 101)])
+test_predictions = net.predict_proba(test_X, keys)
 
-test_accuracy = accuracy(test_labels, test_predictions)
+test_accuracy = accuracy(test_y, test_predictions)
 
 print(f"Test Accuracy: {test_accuracy}")
 
@@ -107,16 +111,17 @@ points_array = np.array(points)
 
 trace = [
     go.Scattergl(
-        x=points_array[:, 0], y=points_array[:, 1], name="train loss", opacity=0.5
-    )
+        x=points_array[:, 0], y=points_array[:, 1], name="train loss", opacity=0.5,
+    ),
+    go.Scattergl(x=points_array[:, 0], y=eval_points, name="test loss", opacity=0.5,),
 ]
 
 layout = go.Layout(
-    title="FizzBuzz Train Loss Over Time",
-    xaxis=dict(title="Number of updates"),
+    title="FizzBuzz Loss Over Time",
+    xaxis=dict(title="epochs"),
     yaxis=dict(title="Loss"),
-    width=600,
-    height=500,
+    width=800,
+    height=700,
 )
 
 fig = go.Figure(data=trace, layout=layout)

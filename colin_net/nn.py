@@ -8,8 +8,8 @@ from typing import List, Tuple, Type, Union
 
 from jax import jit, nn, random, vmap
 
-from colin_net.layers import (ActivationLayer, Dropout, Layer, Linear, Mode,
-                              Tanh)
+from colin_net.layers import (ActivationLayer, Dropout, Initializer, Layer,
+                              Linear, Mode, Tanh)
 from colin_net.tensor import Tensor
 
 suffix = ".pkl"
@@ -59,28 +59,44 @@ class FeedForwardNet(NeuralNet):
         num_hidden: int,
         key: Tensor,
         activation: Type[ActivationLayer] = Tanh,
-        dropout_keep: float = 0.8,
+        dropout_keep: float = None,
+        initializer: str = Initializer.normal,
     ) -> "FeedForwardNet":
         key, subkey = random.split(key)
         layers: List[Layer] = [
-            Linear.initialize(input_size=input_dim, output_size=hidden_dim, key=subkey),
+            Linear.initialize(
+                input_size=input_dim,
+                output_size=hidden_dim,
+                key=subkey,
+                initializer=initializer,
+            ),
             activation(),
-            Dropout(keep=dropout_keep),
         ]
+        if dropout_keep:
+            layers.append(Dropout(keep=dropout_keep))
 
         for i in range(num_hidden - 2):
             key, subkey = random.split(key)
             layers.append(
                 Linear.initialize(
-                    input_size=hidden_dim, output_size=hidden_dim, key=subkey
+                    input_size=hidden_dim,
+                    output_size=hidden_dim,
+                    key=subkey,
+                    initializer=initializer,
                 )
             )
             layers.append(activation())
-            layers.append(Dropout(keep=dropout_keep))
+            if dropout_keep:
+                layers.append(Dropout(keep=dropout_keep))
 
         key, subkey = random.split(key)
         layers.append(
-            Linear.initialize(input_size=hidden_dim, output_size=output_dim, key=subkey)
+            Linear.initialize(
+                input_size=hidden_dim,
+                output_size=output_dim,
+                key=subkey,
+                initializer=initializer,
+            )
         )
         return cls(layers, output_dim)
 

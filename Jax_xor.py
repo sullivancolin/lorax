@@ -24,9 +24,11 @@ key = random.PRNGKey(42)
 
 # Create NeuralNet Instance
 net = FeedForwardNet.create_mlp(
-    input_dim=2, output_dim=2, hidden_dim=2, key=key, dropout_keep=1.0, num_hidden=2,
+    input_dim=2, output_dim=2, hidden_dim=2, key=key, dropout_keep=None, num_hidden=2,
 )
 
+
+breakpoint()
 # Create an iterator over the input data
 iterator = BatchIterator(inputs, targets)
 
