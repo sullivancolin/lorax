@@ -10,6 +10,7 @@ from tqdm.autonotebook import tqdm
 from colin_net import FeedForwardNet
 from colin_net.data import BatchIterator
 from colin_net.loss import mean_sqaured_error
+from colin_net.tensor import Tensor
 from colin_net.train import train
 
 # Create Input Data and True Labels
@@ -27,14 +28,12 @@ net = FeedForwardNet.create_mlp(
     input_dim=2, output_dim=2, hidden_dim=2, key=key, dropout_keep=None, num_hidden=2,
 )
 
-
-breakpoint()
 # Create an iterator over the input data
 iterator = BatchIterator(inputs, targets)
 
 
 # define accuracy calculation
-def accuracy(actual, predicted):
+def accuracy(actual: Tensor, predicted: Tensor) -> float:
     return np.mean(np.argmax(actual, axis=1) == np.argmax(predicted, axis=1))
 
 

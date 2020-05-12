@@ -4,12 +4,19 @@ It behaves a lot like a layer itself.
 """
 import pickle
 from pathlib import Path
-from typing import List, Tuple, Type, Union
+from typing import Any, List, Tuple, Type, Union
 
 from jax import jit, nn, random, vmap
 
-from colin_net.layers import (ActivationLayer, Dropout, Initializer, Layer,
-                              Linear, Mode, Tanh)
+from colin_net.layers import (
+    ActivationLayer,
+    Dropout,
+    Initializer,
+    Layer,
+    Linear,
+    Mode,
+    Tanh,
+)
 from colin_net.tensor import Tensor
 
 suffix = ".pkl"
@@ -19,7 +26,7 @@ class NeuralNet(Layer, is_abstract=True):
     """Abstract Class for NeuralNet. Enforces subclasses to implement
     __call__, tree_flatten, tree_unflatten and registered as Pytree"""
 
-    def __call__(self, inputs: Tensor, **kwargs) -> Tensor:
+    def __call__(self, inputs: Tensor, **kwargs: Any) -> Tensor:
         raise NotImplementedError
 
 
@@ -75,7 +82,7 @@ class FeedForwardNet(NeuralNet):
         if dropout_keep:
             layers.append(Dropout(keep=dropout_keep))
 
-        for i in range(num_hidden - 2):
+        for _ in range(num_hidden - 2):
             key, subkey = random.split(key)
             layers.append(
                 Linear.initialize(
@@ -117,7 +124,7 @@ class FeedForwardNet(NeuralNet):
         )
         return f"<FeedForwardNet layers={layers}>"
 
-    def save(self, path: Union[str, Path], overwrite: bool = False):
+    def save(self, path: Union[str, Path], overwrite: bool = False) -> None:
         path = Path(path)
         if path.suffix != suffix:
             path = path.with_suffix(suffix)

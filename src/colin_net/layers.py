@@ -41,10 +41,10 @@ class Layer(PyTreeLike, is_abstract=True):
     """Abstract Class for Layers. Enforces subclasses to implement
     __call__, tree_flatten, tree_unflatten and registered as Pytree"""
 
-    def __call__(self, inputs: Tensor, **kwargs) -> Tensor:
+    def __call__(self, inputs: Tensor, **kwargs: Any) -> Tensor:
         raise NotImplementedError
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.__repr__()
 
 
@@ -74,7 +74,7 @@ class Linear(Layer):
         return f"<LinearLayer w={self.w.shape}, b={self.b.shape}>"
 
     @jit
-    def __call__(self, inputs: Tensor, **kwargs) -> Tensor:
+    def __call__(self, inputs: Tensor, **kwargs: Any) -> Tensor:
         """outputs = np.dot(w, inputs) + b in single instance notation."""
 
         return np.dot(self.w, inputs) + self.b
@@ -117,7 +117,7 @@ class Dropout(Layer):
         self.mode = mode
 
     @jit
-    def __call__(self, inputs: Tensor, **kwargs) -> Tensor:
+    def __call__(self, inputs: Tensor, **kwargs: Any) -> Tensor:
         """If in train mode, keeps input activations at rate,
         otherwise returns directly"""
 
@@ -136,7 +136,7 @@ class Dropout(Layer):
         mask = random.bernoulli(key, self.keep, inputs.shape)
         return np.where(mask, inputs / self.keep, 0)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<Dropout keep={self.keep}, mode={self.mode}>"
 
     def tree_flatten(self) -> Tuple[List[None], Tuple[float, str]]:
@@ -149,35 +149,35 @@ class Dropout(Layer):
 
 class Tanh(ActivationLayer):
     @jit
-    def __call__(self, inputs: Tensor, **kwargs) -> Tensor:
+    def __call__(self, inputs: Tensor, **kwargs: Any) -> Tensor:
         return np.tanh(inputs)
 
 
 class Relu(ActivationLayer):
     @jit
-    def __call__(self, inputs: Tensor, **kwargs) -> Tensor:
+    def __call__(self, inputs: Tensor, **kwargs: Any) -> Tensor:
         return nn.relu(inputs)
 
 
 class LeakyRelu(ActivationLayer):
     @jit
-    def __call__(self, inputs: Tensor, **kwargs) -> Tensor:
+    def __call__(self, inputs: Tensor, **kwargs: Any) -> Tensor:
         return nn.leaky_relu(inputs)
 
 
 class Selu(ActivationLayer):
     @jit
-    def __call__(self, inputs: Tensor, **kwargs) -> Tensor:
+    def __call__(self, inputs: Tensor, **kwargs: Any) -> Tensor:
         return nn.selu(inputs)
 
 
 class Sigmoid(ActivationLayer):
     @jit
-    def __call__(self, inputs: Tensor, **kwargs) -> Tensor:
+    def __call__(self, inputs: Tensor, **kwargs: Any) -> Tensor:
         return nn.sigmoid(inputs)
 
 
 class Softmax(ActivationLayer):
     @jit
-    def __call__(self, inputs: Tensor, **kwargs) -> Tensor:
+    def __call__(self, inputs: Tensor, **kwargs: Any) -> Tensor:
         return nn.softmax(inputs)

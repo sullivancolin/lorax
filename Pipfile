@@ -10,14 +10,16 @@ black = "*"
 isort = "*"
 better-exceptions = "*"
 ipdb = "*"
+bumpversion = "*"
+pydocstyle = "*"
+pytest = "*"
+pytest-cov = "*"
+pytest-sugar = "*"
+flake8-bugbear = "*"
 
 [packages]
+colin_net = {editable = true,path = "."}
 jupyterlab = "*"
-plotly = "*"
-numpy = "*"
-jax = "*"
-jaxlib = "*"
-tqdm = "*"
 pydantic = "*"
 
 [requires]

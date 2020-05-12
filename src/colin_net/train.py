@@ -21,7 +21,7 @@ def train(
     lr: float = 0.01,
 ) -> Iterator[Tuple[int, float, NeuralNet]]:
     @jit
-    def sgd_update_combiner(param, grad, lr=lr):
+    def sgd_update_combiner(param: Tensor, grad: Tensor, lr: float = lr) -> Tensor:
         """Convenvience method for performing SGD on custom jax Pytree objects"""
         return param - (lr * grad)
 

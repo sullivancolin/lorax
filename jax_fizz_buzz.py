@@ -17,6 +17,7 @@ from tqdm.autonotebook import tqdm
 from colin_net.data import BatchIterator
 from colin_net.loss import mean_sqaured_error
 from colin_net.nn import FeedForwardNet
+from colin_net.tensor import Tensor
 from colin_net.train import train
 
 key = random.PRNGKey(42)
@@ -55,7 +56,7 @@ iterator = BatchIterator(inputs=inputs, targets=targets)
 
 
 # define accuracy calculation
-def accuracy(actual, predicted) -> float:
+def accuracy(actual: Tensor, predicted: Tensor) -> float:
     return np.mean(np.argmax(actual, axis=1) == np.argmax(predicted, axis=1))
 
 
