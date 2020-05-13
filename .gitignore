@@ -70,3 +70,4 @@ target/
 *.html
 *.pkl
 *runs/
+*.json
