@@ -7,11 +7,13 @@ For each of the numbers 1 to 100:
 * if the number is divisible by 15, print "fizzbuzz"
 * otherwise, just print the number
 """
+import datetime
 from typing import List
 
 import jax.numpy as np
-import plotly.graph_objects as go
 from jax import random
+import numpy as onp
+from tensorboardX import SummaryWriter
 from tqdm.autonotebook import tqdm
 
 from colin_net.data import BatchIterator
@@ -47,6 +49,11 @@ targets = np.array([fizz_buzz_encode(x) for x in range(101, 1024)])
 
 test_X = np.array([binary_encode(x) for x in range(1, 101)])
 test_y = np.array([fizz_buzz_encode(x) for x in range(1, 101)])
+
+now = datetime.datetime.now().isoformat()
+
+train_writer = SummaryWriter(f"runs/train-{now}")
+test_writer = SummaryWriter(f"runs/test-{now}")
 
 net = FeedForwardNet.create_mlp(
     input_dim=10, output_dim=4, hidden_dim=50, key=key, num_hidden=2, dropout_keep=None,
@@ -86,7 +93,13 @@ for i, (epoch, loss, net) in enumerate(tqdm(progress, total=num_epochs)):
         test_acc = accuracy(test_y, test_predicted)
         print(f"Train Accuracy: {acc_metric}")
         print(f"Test Accuracy: {test_acc}")
-        if acc_metric >= 0.99:
+        test_writer.add_scalar("accuracy", float(test_acc), i)
+        train_writer.add_scalar("accuracy", float(acc_metric), i)
+        train_writer.add_histogram("Layer1-w", onp.array(net.layers[0].w), i)
+        train_writer.add_histogram("Layer1-b", onp.array(net.layers[0].b), i)
+        train_writer.add_histogram("Layer2-w", onp.array(net.layers[2].w), i)
+        train_writer.add_histogram("Layer2-b", onp.array(net.layers[2].b), i)
+        if test_acc >= 0.99:
             break
         net.train()
 
@@ -95,8 +108,13 @@ for i, (epoch, loss, net) in enumerate(tqdm(progress, total=num_epochs)):
     eval_loss = mean_sqaured_error(net, keys[: len(test_X)], test_X, test_y)
     net.train()
     eval_points.append(eval_loss)
+    test_writer.add_scalar("loss", float(eval_loss), i)
+    train_writer.add_scalar("loss", float(loss), i)
 
 net.eval()
+
+test_writer.close()
+train_writer.close()
 
 net.save("jax_fizz_buzz.pkl", overwrite=True)
 keys = random.split(key, num=test_X.shape[0])
@@ -106,25 +124,3 @@ test_predictions = net.predict_proba(test_X, keys)
 test_accuracy = accuracy(test_y, test_predictions)
 
 print(f"Test Accuracy: {test_accuracy}")
-
-# Plott Loss Curve
-points_array = np.array(points)
-
-trace = [
-    go.Scattergl(
-        x=points_array[:, 0], y=points_array[:, 1], name="train loss", opacity=0.5,
-    ),
-    go.Scattergl(x=points_array[:, 0], y=eval_points, name="test loss", opacity=0.5,),
-]
-
-layout = go.Layout(
-    title="FizzBuzz Loss Over Time",
-    xaxis=dict(title="epochs"),
-    yaxis=dict(title="Loss"),
-    width=800,
-    height=700,
-)
-
-fig = go.Figure(data=trace, layout=layout)
-
-fig.write_html("fizzbuzz_loss_curve.html")

@@ -4,6 +4,7 @@ Here's a function that can train a neural net
 from typing import Iterator, Tuple
 
 from jax import jit, random, value_and_grad
+import jax.numpy as np
 from jax.tree_util import tree_multimap
 
 from colin_net.data import DataIterator
@@ -28,16 +29,17 @@ def train(
     value_grad_fn = value_and_grad(loss)
 
     for epoch in range(num_epochs):
-        epoch_loss = 0.0
+        epoch_losses = []
         for batch in iterator:
             num_keys = batch.inputs.shape[0]
             keys = random.split(key, num_keys + 1)
             key = keys[0]
             subkeys = keys[1:]
             batch_loss, grads = value_grad_fn(net, subkeys, batch.inputs, batch.targets)
-            epoch_loss += batch_loss
+            epoch_losses.append(float(batch_loss))
 
             net = tree_multimap(sgd_update_combiner, net, grads)
 
         # Must return net other as it has been reinstantiated, not mutated.
-        yield (epoch, epoch_loss, net)
+        loss_arr = np.array(epoch_losses)
+        yield (epoch, np.mean(loss_arr), net)

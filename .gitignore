@@ -69,3 +69,4 @@ target/
 
 *.html
 *.pkl
+*runs/

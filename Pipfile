@@ -21,6 +21,7 @@ flake8-bugbear = "*"
 colin_net = {editable = true,path = "."}
 jupyterlab = "*"
 pydantic = "*"
+tensorboardx = "*"
 
 [requires]
 python_version = "3.7"
