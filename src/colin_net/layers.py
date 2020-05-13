@@ -31,7 +31,7 @@ INITIALIZERS = {
 }
 
 
-class Initializer(str, Enum):
+class InitializerEnum(str, Enum):
     normal = "normal"
     glorot_normal = "glorot_normal"
     lecun_normal = "lecun_normal"
@@ -48,6 +48,15 @@ class Layer(PyTreeLike, is_abstract=True):
         return self.__repr__()
 
 
+class ActivationEnum(str, Enum):
+    tanh = "tanh"
+    relu = "relu"
+    leaky_relu = "leaky_relu"
+    selu = "selu"
+    sigmoid = "sigmoid"
+    softmax = "softmax"
+
+
 class ActivationLayer(Layer, is_abstract=True):
     """Abstract Class for Activation Layers."""
 
@@ -57,6 +66,10 @@ class ActivationLayer(Layer, is_abstract=True):
     @classmethod
     def tree_unflatten(cls, aux: Any, data: Iterable[Any]) -> "ActivationLayer":
         return cls()
+
+    @staticmethod
+    def initialize(activation: ActivationEnum) -> "ActivationLayer":
+        return ACTIVATIONS[activation]()
 
     def __repr__(self) -> str:
         return f"<ActivationLayer {self.__class__.__name__}>"
@@ -86,12 +99,12 @@ class Linear(Layer):
         input_size: int,
         output_size: int,
         key: Tensor,
-        initializer: str = Initializer.normal,
+        initializer: InitializerEnum = InitializerEnum.normal,
     ) -> "Linear":
         """Factory for new Linear from input and output dimentsions"""
-        if initializer not in Initializer.__members__:
+        if initializer not in InitializerEnum.__members__:
             raise ValueError(
-                f"initializer: {initializer} not in {Initializer.__members__.values()}"
+                f"initializer: {initializer} not in {InitializerEnum.__members__.values()}"
             )
         return cls(
             w=INITIALIZERS[initializer](key, shape=(output_size, input_size)),
@@ -125,11 +138,11 @@ class Dropout(Layer):
             return inputs
 
         key = kwargs.get("key", None)
-        if key is None:
+        if key is None and self.mode != Mode.eval:
             msg = (
                 "Dropout layer requires __call__ to be called with a PRNG key "
-                "argument. That is, instead of `dropout(inputs)`, call "
-                "it like `dropout(inputs, key)` where `key` is a "
+                "argument. That is, instead of `__call__(inputs)`, use "
+                "it like `__call__(inputs, key)` where `key` is a "
                 "jax.random.PRNGKey value."
             )
             raise ValueError(msg)
@@ -181,3 +194,13 @@ class Softmax(ActivationLayer):
     @jit
     def __call__(self, inputs: Tensor, **kwargs: Any) -> Tensor:
         return nn.softmax(inputs)
+
+
+ACTIVATIONS = {
+    "tanh": Tanh,
+    "relu": Relu,
+    "leaky_relu": LeakyRelu,
+    "selu": Selu,
+    "sigmoid": Sigmoid,
+    "softmax": Softmax,
+}

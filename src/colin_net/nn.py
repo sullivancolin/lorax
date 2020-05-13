@@ -4,18 +4,18 @@ It behaves a lot like a layer itself.
 """
 import pickle
 from pathlib import Path
-from typing import Any, List, Tuple, Type, Union
+from typing import Any, List, Tuple, Union
 
-from jax import jit, nn, random, vmap
+from jax import jit, nn, random, vmap, disable_jit
 
 from colin_net.layers import (
+    ActivationEnum,
     ActivationLayer,
     Dropout,
-    Initializer,
+    InitializerEnum,
     Layer,
     Linear,
     Mode,
-    Tanh,
 )
 from colin_net.tensor import Tensor
 
@@ -33,29 +33,40 @@ class NeuralNet(Layer, is_abstract=True):
 class FeedForwardNet(NeuralNet):
     """Class for feed forward nets like Multilayer Perceptrons."""
 
-    def __init__(self, layers: List[Layer], output_dim: int) -> None:
+    def __init__(self, layers: List[Layer], input_dim: int, output_dim: int) -> None:
         self.layers = layers
+        self.input_dim = input_dim
         self.output_dim = output_dim
 
     @jit
-    def predict(self, inputs: Tensor, key: Tensor) -> Tensor:
+    def predict(self, single_input: Tensor, key: Tensor = None) -> Tensor:
         """Predict for a single instance by iterating over all the layers"""
         for layer in self.layers:
-            inputs = layer(inputs, key=key)
-        return inputs
+            single_input = layer(single_input, key=key)
+        return single_input
 
     @jit
-    def __call__(self, inputs: Tensor, keys: Tensor) -> Tensor:
+    def __call__(self, batched_inputs: Tensor, batched_keys: Tensor = None) -> Tensor:
         """Batched Predictions"""
 
-        return vmap(self.predict)(inputs, keys)
+        return vmap(self.predict)(batched_inputs, batched_keys)
 
     @jit
-    def predict_proba(self, inputs: Tensor, keys: Tensor) -> Tensor:
+    def predict_proba(self, inputs: Tensor, keys: Tensor = None) -> Tensor:
         if self.output_dim > 1:
             return nn.softmax(self.__call__(inputs, keys))
         else:
             return nn.sigmoid(self.__call__(inputs, keys))
+
+    def debug_predict(self, vector_inputs: Tensor, key: Tensor = None) -> Tensor:
+        with disable_jit():
+            self.predict(vector_inputs, key)
+
+    def debug_batch_predict(
+        self, batched_inputs: Tensor, batched_keys: Tensor = None
+    ) -> Tensor:
+        with disable_jit():
+            return self.__call__(batched_inputs, batched_keys)
 
     @classmethod
     def create_mlp(
@@ -65,9 +76,9 @@ class FeedForwardNet(NeuralNet):
         output_dim: int,
         num_hidden: int,
         key: Tensor,
-        activation: Type[ActivationLayer] = Tanh,
+        activation: ActivationEnum = ActivationEnum.tanh,
         dropout_keep: float = None,
-        initializer: str = Initializer.normal,
+        initializer: InitializerEnum = InitializerEnum.normal,
     ) -> "FeedForwardNet":
         key, subkey = random.split(key)
         layers: List[Layer] = [
@@ -77,7 +88,7 @@ class FeedForwardNet(NeuralNet):
                 key=subkey,
                 initializer=initializer,
             ),
-            activation(),
+            ActivationLayer.initialize(activation),
         ]
         if dropout_keep:
             layers.append(Dropout(keep=dropout_keep))
@@ -92,7 +103,7 @@ class FeedForwardNet(NeuralNet):
                     initializer=initializer,
                 )
             )
-            layers.append(activation())
+            layers.append(ActivationLayer.initialize(activation))
             if dropout_keep:
                 layers.append(Dropout(keep=dropout_keep))
 
@@ -105,7 +116,7 @@ class FeedForwardNet(NeuralNet):
                 initializer=initializer,
             )
         )
-        return cls(layers, output_dim)
+        return cls(layers, input_dim, output_dim)
 
     def eval(self) -> None:
         for layer in self.layers:
@@ -148,10 +159,12 @@ class FeedForwardNet(NeuralNet):
             data = pickle.load(file)
         return data
 
-    def tree_flatten(self) -> Tuple[List[Layer], int]:
-        return self.layers, self.output_dim
+    def tree_flatten(self) -> Tuple[List[Layer], Tuple[int, int]]:
+        return self.layers, (self.input_dim, self.output_dim)
 
     @classmethod
-    def tree_unflatten(cls, aux: int, params: List[Layer]) -> "FeedForwardNet":
+    def tree_unflatten(
+        cls, aux: Tuple[int, int], params: List[Layer]
+    ) -> "FeedForwardNet":
 
-        return cls(params, aux)
+        return cls(params, *aux)
