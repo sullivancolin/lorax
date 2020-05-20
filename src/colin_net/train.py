@@ -1,19 +1,20 @@
 """
 Here's a function that can train a neural net
 """
+from datetime import datetime
 from typing import Iterator, Tuple, Union
 
-from jax import jit, random, value_and_grad
 import jax.numpy as np
+from jax import jit, random, value_and_grad
 from jax.tree_util import tree_multimap
 from tensorboardX import SummaryWriter
 
-from colin_net.data import DataIterator
-from colin_net.loss import Loss, LOSS_FUNCTIONS
-from colin_net.nn import NeuralNet, FeedForwardNet
-from colin_net.tensor import Tensor
 from colin_net.config import ExperimentConfig
+from colin_net.data import DataIterator
+from colin_net.loss import LOSS_FUNCTIONS, Loss
+from colin_net.nn import FeedForwardNet, NeuralNet
 from colin_net.optim import OPTIMIZERS, Optimizer
+from colin_net.tensor import Tensor
 
 
 def train(
@@ -60,7 +61,7 @@ class Trainer:
         batch_size: int = 32,
         num_epochs: int = 5000,
         log_metrics: bool = False,
-        checkpoint_every: float = None,
+        save_every: float = None,
     ) -> None:
         self.random_seed = random_seed
         self.key = random.PRNGKey(random_seed)
@@ -73,8 +74,11 @@ class Trainer:
         self.num_epochs = num_epochs
         self.log_metrics = log_metrics
         if self.log_metrics:
-            self.writer = SummaryWriter(f"{self.output_dir}/logs")
-        self.checkpoint_every = checkpoint_every
+            now = datetime.now().isoformat()
+            self.writer = SummaryWriter(f"{self.output_dir}/logs_{now}")
+        if save_every:
+            self.save_every = save_every
+            self.mod_index = int(save_every * num_epochs)
 
     @classmethod
     def from_config(cls, config: ExperimentConfig) -> "Trainer":
@@ -96,9 +100,37 @@ class Trainer:
     def dump_config(self) -> ExperimentConfig:
         raise NotImplementedError
 
-    def train(self) -> NeuralNet:
-        ...
+    def train(self, iterator: DataIterator) -> Iterator[Tuple[int, float, NeuralNet]]:
+        for epoch in range(self.num_epochs):
+            epoch_losses = []
+            for batch in iterator:
+                num_keys = batch.inputs.shape[0]
+                keys = random.split(self.key, num_keys + 1)
+                self.key = keys[0]
+                subkeys = keys[1:]
+                batch_loss, self.net = self.optimzer.step(
+                    subkeys, batch.inputs, batch.targets
+                )
+                epoch_losses.append(float(batch_loss))
 
-    def log(self, name: str, value: Union[int, float], i: int) -> None:
+            # Must return net other as it has been reinstantiated, not mutated.
+            epoch_loss = float(np.array(epoch_losses).mean())
+
+            self.checkpoint("train_loss", epoch_loss, epoch)
+            yield (epoch, epoch_loss, self.net)
+        self.net.save(f"{self.output_dir}/final.pkl")
+
+    def __enter__(self) -> "Trainer":
+        """Use Trainer with Context Manager."""
+        return self
+
+    def __exit__(self, exception_type, exception_value, traceback):  # type: ignore
+        """Exit Context Manager and close logger."""
+        self.writer.close()
+
+    def checkpoint(self, name: str, value: Union[int, float], i: int) -> None:
         if self.log_metrics:
-            self.writer(name, value, i)
+            self.writer.add_scalar(name, value, i)
+        if self.save_every:
+            if i % self.mod_index == 0:
+                self.net.save(f"{self.output_dir}/epoch_{i}.pkl")

@@ -1,11 +1,11 @@
 import json
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from pydantic import BaseModel
 
 from colin_net.layers import ActivationEnum, InitializerEnum
-from colin_net.optim import OptimizerEnum
 from colin_net.loss import LossEnum
+from colin_net.optim import OptimizerEnum
 
 
 class NetConfig(BaseModel):
@@ -28,10 +28,14 @@ class ExperimentConfig(BaseModel):
     batch_size: int = 32
     num_epochs: int = 5000
     log_metrics: bool = False
-    checkpoint_every: Optional[float] = None
+    save_every: Optional[float] = None
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "ExperimentConfig":
+        return cls(**d)
 
     @classmethod
     def from_file(cls, filename: str) -> "ExperimentConfig":
         with open(filename) as infile:
             d = json.load(infile)
-            return cls(**d)
+            return cls.from_dict(d)

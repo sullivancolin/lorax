@@ -2,6 +2,8 @@
 The canonical example of a function that can't be
 learned with a simple linear model is XOR
 """
+import datetime
+
 import jax.numpy as np
 from jax import random
 from tensorboardX import SummaryWriter
@@ -12,8 +14,6 @@ from colin_net.data import BatchIterator
 from colin_net.loss import mean_sqaured_error
 from colin_net.tensor import Tensor
 from colin_net.train import train
-
-import datetime
 
 now = datetime.datetime.now().isoformat()
 writer = SummaryWriter(f"xor_runs/train-{now}")

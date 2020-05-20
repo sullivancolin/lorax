@@ -6,7 +6,7 @@ import pickle
 from pathlib import Path
 from typing import Any, List, Tuple, Union
 
-from jax import jit, nn, random, vmap, disable_jit
+from jax import jit, nn, random, vmap
 
 from colin_net.layers import (
     ActivationEnum,
@@ -24,9 +24,16 @@ suffix = ".pkl"
 
 class NeuralNet(Layer, is_abstract=True):
     """Abstract Class for NeuralNet. Enforces subclasses to implement
-    __call__, tree_flatten, tree_unflatten and registered as Pytree"""
+    __call__, tree_flatten, tree_unflatten, save, load and registered as Pytree"""
 
     def __call__(self, inputs: Tensor, **kwargs: Any) -> Tensor:
+        raise NotImplementedError
+
+    def save(self, path: Union[str, Path], overwrite: bool = False) -> None:
+        raise NotImplementedError
+
+    @classmethod
+    def load(cls, path: Union[str, Path]) -> "FeedForwardNet":
         raise NotImplementedError
 
 
@@ -57,16 +64,6 @@ class FeedForwardNet(NeuralNet):
             return nn.softmax(self.__call__(inputs, keys))
         else:
             return nn.sigmoid(self.__call__(inputs, keys))
-
-    def debug_predict(self, vector_inputs: Tensor, key: Tensor = None) -> Tensor:
-        with disable_jit():
-            self.predict(vector_inputs, key)
-
-    def debug_batch_predict(
-        self, batched_inputs: Tensor, batched_keys: Tensor = None
-    ) -> Tensor:
-        with disable_jit():
-            return self.__call__(batched_inputs, batched_keys)
 
     @classmethod
     def create_mlp(

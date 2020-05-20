@@ -11,8 +11,8 @@ import datetime
 from typing import List
 
 import jax.numpy as np
-from jax import random
 import numpy as onp
+from jax import random
 from tensorboardX import SummaryWriter
 from tqdm.autonotebook import tqdm
 
