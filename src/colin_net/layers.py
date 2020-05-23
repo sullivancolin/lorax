@@ -9,7 +9,7 @@ from enum import Enum
 from typing import Any, Iterable, List, Tuple
 
 import jax.numpy as np
-from jax import jit, nn, random
+from jax import jit, nn, ops, random
 
 from colin_net.base import PyTreeLike
 from colin_net.tensor import Tensor
@@ -158,6 +158,104 @@ class Dropout(Layer):
     @classmethod
     def tree_unflatten(cls, aux: Tuple[float, str], params: List[Any]) -> "Dropout":
         return cls(*aux)
+
+
+class Embedding(Layer):
+    def __init__(self, embedding_matrix: Tensor) -> None:
+        self.embedding_matrix = embedding_matrix
+
+    @jit
+    def __call__(self, inputs: Tensor, **kwargs: Any) -> Tensor:
+        return self.embedding_matrix[inputs]
+
+    @classmethod
+    def initialize(
+        cls,
+        vocab_size: int,
+        hidden_dim: int,
+        key: Tensor,
+        initializer: InitializerEnum = InitializerEnum.glorot_normal,
+    ) -> "Embedding":
+        vectors = INITIALIZERS[initializer](key, shape=(vocab_size, hidden_dim))
+        vectors = ops.index_update(vectors, ops.index[0, :], 0.0)
+        return cls(vectors)
+
+    def tree_flatten(self) -> Tuple[Tuple[Tensor], None]:
+        return (self.embedding_matrix,), None
+
+    @classmethod
+    def tree_unflatten(cls, aux_data: Any, values: Tuple[Tensor]) -> "Embedding":
+        return cls(*values)
+
+
+class LSTMCell(Layer):
+    def __init__(
+        self,
+        Wf: Tensor,
+        bf: Tensor,
+        Wi: Tensor,
+        bi: Tensor,
+        Wc: Tensor,
+        bc: Tensor,
+        Wo: Tensor,
+        bo: Tensor,
+    ) -> None:
+        self.Wf = Wf
+        self.bf = bf
+        self.Wi = Wi
+        self.bi = bi
+        self.Wc = Wc
+        self.bc = bc
+        self.Wo = Wo
+        self.bo = bo
+
+    @classmethod
+    def initialize(cls, input_dim: int, hidden_dim: int, key: Tensor) -> "LSTMCell":
+
+        Wf_key, Wi_key, Wc_key, Wo_key = random.split(key, num=4)
+
+        concat_size = input_dim + hidden_dim
+
+        Wf = INITIALIZERS["glorot_normal"](Wf_key, shape=(hidden_dim, concat_size))
+        bf = np.zeros(shape=(hidden_dim,))
+
+        Wi = INITIALIZERS["glorot_normal"](Wi_key, shape=(hidden_dim, concat_size))
+        bi = np.zeros(shape=(hidden_dim,))
+
+        Wc = INITIALIZERS["glorot_normal"](Wc_key, shape=(hidden_dim, concat_size))
+        bc = np.zeros(shape=(hidden_dim,))
+
+        Wo = INITIALIZERS["glorot_normal"](Wo_key, shape=(hidden_dim, concat_size))
+        bo = np.zeros(shape=(hidden_dim,))
+
+        return cls(Wf, bf, Wi, bi, Wc, bc, Wo, bo)
+
+    @jit
+    def __call__(
+        self, inputs: Tensor, hidden_prev: Tensor, c_prev: Tensor, **kwargs: Any
+    ) -> Tuple[Tensor, Tensor]:
+
+        concat_vec = np.hstack((inputs, hidden_prev))
+
+        f = nn.sigmoid(np.dot(self.Wf, concat_vec) + self.bf)
+        i = nn.sigmoid(np.dot(self.Wi, concat_vec) + self.bi)
+        C_bar = np.tanh(np.dot(self.Wc, concat_vec) + self.bc)
+
+        c = f * c_prev + i * C_bar
+        o = nn.sigmoid(np.dot(self.Wo, concat_vec) + self.bo)
+        h = o * np.tanh(c)
+
+        return h, c
+
+    def tree_flatten(self) -> Tuple[List[Tensor], None]:
+        return (
+            [self.Wf, self.bf, self.Wi, self.bi, self.Wc, self.bc, self.Wo, self.bo],
+            None,
+        )
+
+    @classmethod
+    def tree_unflatten(cls, aux_data: Any, params: List[Tensor]) -> "LSTMCell":
+        return cls(*params)
 
 
 class Tanh(ActivationLayer):

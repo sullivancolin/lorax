@@ -9,7 +9,7 @@ from jax import random
 from tensorboardX import SummaryWriter
 from tqdm.autonotebook import tqdm
 
-from colin_net import FeedForwardNet
+from colin_net import MLP
 from colin_net.data import BatchIterator
 from colin_net.loss import mean_sqaured_error
 from colin_net.tensor import Tensor
@@ -29,12 +29,12 @@ key = random.PRNGKey(42)
 
 
 # Create NeuralNet Instance
-net = FeedForwardNet.create_mlp(
+net = MLP.create_mlp(
     input_dim=2, output_dim=2, hidden_dim=2, key=key, dropout_keep=None, num_hidden=2,
 )
 
 # Create an iterator over the input data
-iterator = BatchIterator(inputs, targets)
+iterator = BatchIterator(inputs, targets, key)
 
 
 # define accuracy calculation

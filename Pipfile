@@ -8,7 +8,6 @@ flake8 = "*"
 mypy = "*"
 black = "*"
 isort = "*"
-better-exceptions = "*"
 ipdb = "*"
 bumpversion = "*"
 pydocstyle = "*"
@@ -22,6 +21,9 @@ colin_net = {editable = true,path = "."}
 jupyterlab = "*"
 pydantic = "*"
 tensorboardx = "*"
+sentencepiece = "*"
+ipywidgets = "*"
+joblib = "*"
 
 [requires]
 python_version = "3.7"

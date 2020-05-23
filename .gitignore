@@ -71,3 +71,8 @@ target/
 *.pkl
 *runs/
 *.json
+*.gz
+*.model
+*.vocab
+*.zip
+*.txt

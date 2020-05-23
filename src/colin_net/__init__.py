@@ -1,3 +1,3 @@
-from .nn import FeedForwardNet, NeuralNet
+from .nn import NeuralNet, LSTMClassifier, MLP
 
-__all__ = ["FeedForwardNet", "NeuralNet"]
+__all__ = ["MLP", "NeuralNet", "LSTMClassifier"]

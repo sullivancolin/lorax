@@ -12,7 +12,7 @@ from tensorboardX import SummaryWriter
 from colin_net.config import ExperimentConfig
 from colin_net.data import DataIterator
 from colin_net.loss import LOSS_FUNCTIONS, Loss
-from colin_net.nn import FeedForwardNet, NeuralNet
+from colin_net.nn import MLP, NeuralNet
 from colin_net.optim import OPTIMIZERS, Optimizer
 from colin_net.tensor import Tensor
 
@@ -83,7 +83,7 @@ class Trainer:
     @classmethod
     def from_config(cls, config: ExperimentConfig) -> "Trainer":
         key = random.PRNGKey(config.random_seed)
-        net = FeedForwardNet.create_mlp(key=key, **config.net_config.dict())
+        net = MLP.create_mlp(key=key, **config.net_config.dict())
         loss = LOSS_FUNCTIONS[config.loss]
         optimizer = OPTIMIZERS[config.optimizer].initialize(
             net, loss, config.learning_rate
