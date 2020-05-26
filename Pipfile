@@ -24,6 +24,9 @@ tensorboardx = "*"
 sentencepiece = "*"
 ipywidgets = "*"
 joblib = "*"
+plotly = "*"
+pandas = "*"
+scikit-learn = "*"
 
 [requires]
 python_version = "3.7"

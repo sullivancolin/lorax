@@ -24,22 +24,22 @@ class LossEnum(str, Enum):
 
 @jit
 def mean_sqaured_error(
-    model: NeuralNet, keys: Tensor, inputs: Tensor, actual: Tensor
+    model: NeuralNet, keys: Tensor, inputs: Tensor, targets: Tensor
 ) -> float:
 
     predicted = model(inputs, batched_keys=keys)
-    return np.mean((predicted - actual) ** 2)
+    return np.mean((predicted - targets) ** 2)
 
 
 @jit
-def cross_entropy_loss(
-    model: NeuralNet, keys: Tensor, inputs: Tensor, actual: Tensor
+def binary_cross_entropy_loss(
+    model: NeuralNet, keys: Tensor, inputs: Tensor, targets: Tensor
 ) -> float:
     predicted = model(inputs, batched_keys=keys)
-    return -np.sum(actual * np.log(predicted) + (1 - actual) * np.log(1 - predicted))
+    return -np.mean(targets * np.log(predicted) + (1 - targets) * np.log(1 - predicted))
 
 
 LOSS_FUNCTIONS = {
     "mean_squared_error": mean_sqaured_error,
-    "cross_entropy_loss": cross_entropy_loss,
+    "binary_cross_entropy_loss": binary_cross_entropy_loss,
 }

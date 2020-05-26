@@ -232,10 +232,11 @@ class LSTMCell(Layer):
 
     @jit
     def __call__(
-        self, inputs: Tensor, hidden_prev: Tensor, c_prev: Tensor, **kwargs: Any
-    ) -> Tuple[Tensor, Tensor]:
+        self, state: Tuple[Tensor, Tensor], inputs: Tensor, **kwargs: Any
+    ) -> Tuple[Tuple[Tensor, Tensor], Tensor]:
 
-        concat_vec = np.hstack((inputs, hidden_prev))
+        h_prev, c_prev = state
+        concat_vec = np.hstack((inputs, h_prev))
 
         f = nn.sigmoid(np.dot(self.Wf, concat_vec) + self.bf)
         i = nn.sigmoid(np.dot(self.Wi, concat_vec) + self.bi)
@@ -245,7 +246,8 @@ class LSTMCell(Layer):
         o = nn.sigmoid(np.dot(self.Wo, concat_vec) + self.bo)
         h = o * np.tanh(c)
 
-        return h, c
+        # hiddent state vector is copied as out_put
+        return (h, c), h
 
     def tree_flatten(self) -> Tuple[List[Tensor], None]:
         return (

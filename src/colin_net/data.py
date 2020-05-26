@@ -32,6 +32,10 @@ class BatchIterator(DataIterator):
         self.targets = targets
         self.batch_size = batch_size
         self.key = key
+        self.len = len(self.inputs)
+
+    def __len__(self) -> int:
+        return self.len
 
     def __iter__(self) -> Iterator[Batch]:
         starts = np.arange(0, len(self.inputs), self.batch_size)
@@ -57,6 +61,10 @@ class PaddedIterator(DataIterator):
         self.targets = np.array(onp.array(targets))
         self.batch_size = batch_size
         self.key = key
+        self.len = len(self.inputs)
+
+    def __len__(self) -> int:
+        return self.len
 
     def left_pad_batch(self, batch_inputs: List[List[int]]) -> Tensor:
         max_len = max(len(sentence) for sentence in batch_inputs)

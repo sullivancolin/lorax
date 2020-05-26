@@ -18,7 +18,7 @@ from tqdm.autonotebook import tqdm
 
 from colin_net.data import BatchIterator
 from colin_net.loss import mean_sqaured_error
-from colin_net.nn import FeedForwardNet
+from colin_net.nn import MLP
 from colin_net.tensor import Tensor
 from colin_net.train import train
 
@@ -55,11 +55,11 @@ now = datetime.datetime.now().isoformat()
 train_writer = SummaryWriter(f"runs/train-{now}")
 test_writer = SummaryWriter(f"runs/test-{now}")
 
-net = FeedForwardNet.create_mlp(
+net = MLP.create_mlp(
     input_dim=10, output_dim=4, hidden_dim=50, key=key, num_hidden=2, dropout_keep=None,
 )
 
-iterator = BatchIterator(inputs=inputs, targets=targets)
+iterator = BatchIterator(inputs=inputs, targets=targets, key=key)
 
 
 # define accuracy calculation

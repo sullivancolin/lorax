@@ -6,6 +6,7 @@ from typing import Iterator, Tuple, Union
 
 import jax.numpy as np
 from jax import jit, random, value_and_grad
+from jax.experimental.optimizers import adam
 from jax.tree_util import tree_multimap
 from tensorboardX import SummaryWriter
 
@@ -23,30 +24,37 @@ def train(
     num_epochs: int,
     iterator: DataIterator,
     loss: Loss,
+    writer: SummaryWriter,
     lr: float = 0.01,
 ) -> Iterator[Tuple[int, float, NeuralNet]]:
-    @jit
-    def sgd_update_combiner(param: Tensor, grad: Tensor, lr: float = lr) -> Tensor:
-        """Convenvience method for performing SGD on custom jax Pytree objects"""
-        return param - (lr * grad)
+    # @jit
+    # def sgd_update_combiner(param: Tensor, grad: Tensor, lr: float = lr) -> Tensor:
+    #     """Convenvience method for performing SGD on custom jax Pytree objects"""
+    #     return param - (lr * grad)
 
     value_grad_fn = value_and_grad(loss)
 
+    init_fun, update_fun, get_params = adam(step_size=lr)
+    opt_state = init_fun(net)
+    update_count = 0
     for epoch in range(num_epochs):
-        epoch_losses = []
+        epoch_loss = 0.0
         for batch in iterator:
-            num_keys = batch.inputs.shape[0]
-            keys = random.split(key, num_keys + 1)
-            key = keys[0]
-            subkeys = keys[1:]
-            batch_loss, grads = value_grad_fn(net, subkeys, batch.inputs, batch.targets)
-            epoch_losses.append(float(batch_loss))
 
-            net = tree_multimap(sgd_update_combiner, net, grads)
+            batch_loss, grads = value_grad_fn(
+                net, keys=None, inputs=batch.inputs, targets=batch.targets
+            )
+            opt_state = update_fun(update_count, grads, opt_state)
+            update_count += 1
+            # batch_loss, grads = value_grad_fn(net, subkeys, batch.inputs, batch.targets)
+            epoch_loss += batch_loss
 
+            # net = tree_multimap(sgd_update_combiner, net, grads)
+            net = get_params(opt_state)
         # Must return net other as it has been reinstantiated, not mutated.
-        loss_arr = np.array(epoch_losses)
-        yield (epoch, np.mean(loss_arr), net)
+        epoch_loss = float(epoch_loss) / iterator.len
+
+        yield (epoch, epoch_loss, net)
 
 
 class Trainer:

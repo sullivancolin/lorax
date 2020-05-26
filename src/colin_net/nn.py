@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, List, Tuple, Union
 
 import jax.numpy as np
-from jax import jit, nn, random, vmap
+from jax import jit, nn, random, vmap, lax
 
 from colin_net.layers import (
     INITIALIZERS,
@@ -34,6 +34,13 @@ class NeuralNet(Layer, is_abstract=True):
 
     def __call__(self, inputs: Tensor, **kwargs: Any) -> Tensor:
         raise NotImplementedError
+
+    @jit
+    def predict_proba(self, inputs: Tensor, **kwargs) -> Tensor:
+        if self.output_dim > 1:
+            return nn.softmax(self.__call__(inputs, **kwargs))
+        else:
+            return nn.sigmoid(self.__call__(inputs, **kwargs))
 
     def save(self, path: Union[str, Path], overwrite: bool = False) -> None:
         path = Path(path)
@@ -80,13 +87,6 @@ class MLP(NeuralNet):
         """Batched Predictions"""
 
         return vmap(self.predict)(batched_inputs, batched_keys)
-
-    @jit
-    def predict_proba(self, inputs: Tensor, keys: Tensor = None) -> Tensor:
-        if self.output_dim > 1:
-            return nn.softmax(self.__call__(inputs, keys))
-        else:
-            return nn.sigmoid(self.__call__(inputs, keys))
 
     @classmethod
     def create_mlp(
@@ -172,12 +172,14 @@ class LSTMClassifier(NeuralNet):
         output_layer: Linear,
         h_prev: Tensor,
         c_prev: Tensor,
+        output_dim: int,
     ) -> None:
         self.embeddings = embeddings
         self.cell = cell
         self.output_layer = output_layer
         self.h_prev = h_prev
         self.c_prev = c_prev
+        self.output_dim = output_dim
 
     @classmethod
     def initialize(
@@ -199,7 +201,7 @@ class LSTMClassifier(NeuralNet):
         h_prev = np.zeros(shape=(hidden_dim,))
         c_prev = np.zeros(shape=(hidden_dim,))
 
-        return cls(embedding, cell, linear, h_prev, c_prev)
+        return cls(embedding, cell, linear, h_prev, c_prev, output_dim)
 
     @jit
     def predict(
@@ -211,19 +213,23 @@ class LSTMClassifier(NeuralNet):
             c_prev = self.c_prev
 
         sentence_embedding = self.embeddings(single_input)
+        state_tuple, output_sequence = lax.scan(
+            self.cell.__call__, init=(h_prev, c_prev), xs=sentence_embedding
+        )
+        # Semantics of lax.scan
+        # outputs = []
+        # for word_vector in sentence_embedding:
+        #     (h_prev, c_prev), output = self.cell((h_prev, c_prev), word_vector)
+        #     outputs.append(output)
+        # return (h_new, c_new), outputs
 
-        for word_vector in sentence_embedding:
-
-            h_new, c_new = self.cell(word_vector, h_prev, c_prev)
-            h_prev = h_new
-            c_prev = c_new
-
-        output = self.output_layer(h_prev)
+        h_final = output_sequence[-1]
+        output = self.output_layer(h_final)
 
         return output
 
     @jit
-    def __call__(self, batched_inputs: Tensor) -> Tensor:
+    def __call__(self, batched_inputs: Tensor, **kwargs: Any) -> Tensor:
 
         batched_h_prev = np.tile(self.h_prev, (batched_inputs.shape[0], 1))
 
@@ -233,17 +239,17 @@ class LSTMClassifier(NeuralNet):
 
     def tree_flatten(
         self,
-    ) -> Tuple[Tuple[Embedding, LSTMCell, Linear, Tensor, Tensor], None]:
+    ) -> Tuple[Tuple[Embedding, LSTMCell, Linear, Tensor, Tensor], int]:
         return (
             (self.embeddings, self.cell, self.output_layer, self.h_prev, self.c_prev),
-            None,
+            self.output_dim,
         )
 
     @classmethod
     def tree_unflatten(
-        cls, aux: Any, params: Tuple[Embedding, LSTMCell, Linear, Tensor, Tensor]
+        cls, aux: int, params: Tuple[Embedding, LSTMCell, Linear, Tensor, Tensor]
     ) -> "LSTMClassifier":
-        return cls(*params)
+        return cls(*params, output_dim=aux)
 
 
 __all__ = ["NeuralNet", "MLP", "LSTMClassifier"]
