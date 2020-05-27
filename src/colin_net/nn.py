@@ -4,10 +4,10 @@ It behaves a lot like a layer itself.
 """
 import pickle
 from pathlib import Path
-from typing import Any, List, Tuple, Union
+from typing import Any, List, Union
 
 import jax.numpy as np
-from jax import jit, nn, random, vmap, lax
+from jax import jit, lax, nn, random, vmap
 
 from colin_net.layers import (
     INITIALIZERS,
@@ -56,7 +56,7 @@ class NeuralNet(Layer, is_abstract=True):
             pickle.dump(self, file)
 
     @classmethod
-    def load(cls, path: Union[str, Path]) -> "MLP":
+    def load(cls, path: Union[str, Path]) -> "NeuralNet":
         path = Path(path)
         if not path.is_file():
             raise ValueError(f"Not a file: {path}")
@@ -70,10 +70,9 @@ class NeuralNet(Layer, is_abstract=True):
 class MLP(NeuralNet):
     """Class for feed forward nets like Multilayer Perceptrons."""
 
-    def __init__(self, layers: List[Layer], input_dim: int, output_dim: int) -> None:
-        self.layers = layers
-        self.input_dim = input_dim
-        self.output_dim = output_dim
+    layers: List[Layer]
+    input_dim: int
+    output_dim: int
 
     @jit
     def predict(self, single_input: Tensor, key: Tensor = None) -> Tensor:
@@ -91,6 +90,7 @@ class MLP(NeuralNet):
     @classmethod
     def create_mlp(
         cls,
+        *,
         input_dim: int,
         hidden_dim: int,
         output_dim: int,
@@ -136,54 +136,33 @@ class MLP(NeuralNet):
                 initializer=initializer,
             )
         )
-        return cls(layers, input_dim, output_dim)
+        return cls(layers=layers, input_dim=input_dim, output_dim=output_dim)
 
     def eval(self) -> None:
-        for layer in self.layers:
+        for i, layer in enumerate(self.layers):
             if isinstance(layer, Dropout):
-                layer.mode = Mode.eval
+                newlayer = Dropout(keep=layer.keep, mode=Mode.eval)
+                self.layers[i] = newlayer
 
     def train(self) -> None:
-        for layer in self.layers:
+        for i, layer in enumerate(self.layers):
             if isinstance(layer, Dropout):
-                layer.mode = Mode.train
-
-    def __repr__(self) -> str:
-
-        layers = (
-            "\n\t" + "\n\t".join([layer.__repr__() for layer in self.layers]) + "\n"
-        )
-        return f"<MLP layers={layers}>"
-
-    def tree_flatten(self) -> Tuple[List[Layer], Tuple[int, int]]:
-        return self.layers, (self.input_dim, self.output_dim)
-
-    @classmethod
-    def tree_unflatten(cls, aux: Tuple[int, int], params: List[Layer]) -> "MLP":
-
-        return cls(params, *aux)
+                newlayer = Dropout(keep=layer.keep, mode=Mode.train)
+                self.layers[i] = newlayer
 
 
 class LSTMClassifier(NeuralNet):
-    def __init__(
-        self,
-        embeddings: Embedding,
-        cell: LSTMCell,
-        output_layer: Linear,
-        h_prev: Tensor,
-        c_prev: Tensor,
-        output_dim: int,
-    ) -> None:
-        self.embeddings = embeddings
-        self.cell = cell
-        self.output_layer = output_layer
-        self.h_prev = h_prev
-        self.c_prev = c_prev
-        self.output_dim = output_dim
+
+    embeddings: Embedding
+    cell: LSTMCell
+    output_layer: Linear
+    h_prev = Tensor
+    c_prev = Tensor
+    output_dim: int
 
     @classmethod
     def initialize(
-        cls, vocab_size: int, hidden_dim: int, output_dim: int, key: Tensor
+        cls, *, vocab_size: int, hidden_dim: int, output_dim: int, key: Tensor
     ) -> "LSTMClassifier":
         key, subkey = random.split(key)
         embedding = Embedding.initialize(vocab_size, hidden_dim, subkey)
@@ -201,7 +180,14 @@ class LSTMClassifier(NeuralNet):
         h_prev = np.zeros(shape=(hidden_dim,))
         c_prev = np.zeros(shape=(hidden_dim,))
 
-        return cls(embedding, cell, linear, h_prev, c_prev, output_dim)
+        return cls(
+            embeddings=embedding,
+            cell=cell,
+            output_layer=linear,
+            h_prev=h_prev,
+            c_prev=c_prev,
+            output_dim=output_dim,
+        )
 
     @jit
     def predict(
@@ -236,20 +222,6 @@ class LSTMClassifier(NeuralNet):
         batched_c_prev = np.tile(self.c_prev, (batched_inputs.shape[0], 1))
 
         return vmap(self.predict)(batched_inputs, batched_h_prev, batched_c_prev)
-
-    def tree_flatten(
-        self,
-    ) -> Tuple[Tuple[Embedding, LSTMCell, Linear, Tensor, Tensor], int]:
-        return (
-            (self.embeddings, self.cell, self.output_layer, self.h_prev, self.c_prev),
-            self.output_dim,
-        )
-
-    @classmethod
-    def tree_unflatten(
-        cls, aux: int, params: Tuple[Embedding, LSTMCell, Linear, Tensor, Tensor]
-    ) -> "LSTMClassifier":
-        return cls(*params, output_dim=aux)
 
 
 __all__ = ["NeuralNet", "MLP", "LSTMClassifier"]

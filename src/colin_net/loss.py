@@ -33,10 +33,14 @@ def mean_sqaured_error(
 
 @jit
 def binary_cross_entropy_loss(
-    model: NeuralNet, keys: Tensor, inputs: Tensor, targets: Tensor
+    model: NeuralNet, keys: Tensor, inputs: Tensor, targets: Tensor, tol: float = 1e-10
 ) -> float:
     predicted = model(inputs, batched_keys=keys)
-    return -np.mean(targets * np.log(predicted) + (1 - targets) * np.log(1 - predicted))
+
+    return -np.mean(
+        targets * np.log(np.maximum(tol, predicted))
+        + (1 - targets) * np.log(np.maximum(tol, 1 - predicted))
+    )
 
 
 LOSS_FUNCTIONS = {

@@ -1,18 +1,17 @@
-from typing import List, Iterator, Tuple
+import gzip
+from datetime import datetime
+from typing import Iterator, List, Tuple
 
-import sentencepiece as spm
-from tqdm.autonotebook import tqdm
-
-from jax import random
 import jax.numpy as np
 import numpy as onp
-import gzip
+import sentencepiece as spm
+from jax import random
 from tensorboardX import SummaryWriter
-from datetime import datetime
+from tqdm.autonotebook import tqdm
 
 from colin_net.data import PaddedIterator
-from colin_net.nn import LSTMClassifier
 from colin_net.loss import mean_sqaured_error
+from colin_net.nn import LSTMClassifier
 from colin_net.tensor import Tensor
 from colin_net.train import train
 
