@@ -10,7 +10,7 @@ from tensorboardX import SummaryWriter
 from tqdm.autonotebook import tqdm
 
 from colin_net.data import PaddedIterator
-from colin_net.loss import mean_sqaured_error
+from colin_net.loss import mean_squared_error
 from colin_net.nn import LSTMClassifier
 from colin_net.tensor import Tensor
 from colin_net.train import train
@@ -103,10 +103,9 @@ num_epochs = 100
 progress = train(
     lstm,
     key=key,
-    loss=mean_sqaured_error,
+    loss=mean_squared_error,
     iterator=train_iterator,
     num_epochs=num_epochs,
-    writer=train_writer,
     lr=0.001,
 )
 

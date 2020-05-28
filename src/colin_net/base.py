@@ -3,9 +3,10 @@ Abstract Base class with automatic Pytree registration
 Inspired by from https://github.com/google/jax/issues/2916
 """
 import json
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, List, Tuple, Union
 
 from jax.tree_util import register_pytree_node
+from jax.interpreters.ad import JVPTracer
 from pydantic import BaseModel
 
 from colin_net.tensor import Tensor
@@ -14,7 +15,7 @@ __all__ = ["Module"]
 
 
 FlattenedParams = Tuple[Union["Module", Tensor], ...]
-FlattenedMetadata = Tuple[List[Tuple[str, Any]], List[Tuple[str, int]]]
+FlattenedMetadata = Tuple[Tuple[Tuple[str, Any]], Tuple[Tuple[str, ...]]]
 
 
 class Module(BaseModel):
@@ -39,42 +40,41 @@ class Module(BaseModel):
     ) -> Tuple[
         FlattenedParams, FlattenedMetadata,
     ]:
-        d = self.__dict__
-        flattened_params = []
-        param_metadata = {}
-
-        for key, val in d.items():
-            if isinstance(val, Tensor) or isinstance(val, Module):
-                flattened_params.append(val)
-                param_metadata[key] = 0
+        fields = self.__fields__
+        params = []
+        param_metadata = []
+        for key in fields:
+            val = getattr(self, key)
+            if (
+                isinstance(val, Tensor)
+                or isinstance(val, Module)
+                or isinstance(val, JVPTracer)
+            ):
+                params.append(val)
+                param_metadata.append(key)
             elif isinstance(val, List) and isinstance(val[0], Module):
-                flattened_params.extend(val)
-                param_metadata[key] = len(val)
+                params.append(val)
+                param_metadata.append(key)
 
-        flattened_remainder = [
-            (key, val) for key, val in d.items() if key not in param_metadata
-        ]
-        flattened_metadata = [(key, val) for key, val in param_metadata.items()]
-        return tuple(flattened_params), (flattened_remainder, flattened_metadata)
+        flattened_remainder = tuple(
+            (key, getattr(self, key)) for key in fields if key not in param_metadata
+        )
+        flattened_metadata = tuple(param_metadata)
+
+        return tuple(params), (flattened_remainder, flattened_metadata)  # type: ignore
 
     @classmethod
     def tree_unflatten(
         cls, aux: FlattenedMetadata, params: FlattenedParams,
     ) -> "Module":
+        # breakpoint()
         flattened_remainder, flattened_metadata = aux
-        flattened_params = list(params)
-        metadata_dict: Dict[str, int] = {key: val for (key, val) in flattened_metadata}
-        constructor_dict: Dict[str, Any] = {
-            key: val for (key, val) in flattened_remainder
-        }
-        for key, val in metadata_dict.items():
-            if val == 0:
-                constructor_dict[key] = flattened_params.pop(0)
-            else:
-                items = []
-                for _ in range(val):
-                    items.append(flattened_params.pop(0))
-                constructor_dict[key] = items
+
+        metadata_dict = {key: val for (key, val) in flattened_remainder}
+
+        param_dict = {key: val for (key, val) in zip(flattened_metadata, params)}
+
+        constructor_dict = {**param_dict, **metadata_dict}  # type: ignore
 
         # Disable validation from unflattening for speed up
-        return cls.construct(**constructor_dict)
+        return cls.construct(**constructor_dict)  # type: ignore

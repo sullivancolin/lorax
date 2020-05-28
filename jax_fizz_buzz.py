@@ -17,7 +17,7 @@ from tensorboardX import SummaryWriter
 from tqdm.autonotebook import tqdm
 
 from colin_net.data import BatchIterator
-from colin_net.loss import mean_sqaured_error
+from colin_net.loss import mean_squared_error
 from colin_net.nn import MLP
 from colin_net.tensor import Tensor
 from colin_net.train import train
@@ -105,7 +105,7 @@ for i, (epoch, loss, net) in enumerate(tqdm(progress, total=num_epochs)):
 
     points.append([epoch, loss])
     net.eval()
-    eval_loss = mean_sqaured_error(net, keys[: len(test_X)], test_X, test_y)
+    eval_loss = mean_squared_error(net, keys[: len(test_X)], test_X, test_y)
     net.train()
     eval_points.append(eval_loss)
     test_writer.add_scalar("loss", float(eval_loss), i)

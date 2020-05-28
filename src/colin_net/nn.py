@@ -36,11 +36,11 @@ class NeuralNet(Layer, is_abstract=True):
         raise NotImplementedError
 
     @jit
-    def predict_proba(self, inputs: Tensor, **kwargs) -> Tensor:
+    def predict_proba(self, inputs: Tensor, keys: Tensor = None) -> Tensor:
         if self.output_dim > 1:
-            return nn.softmax(self.__call__(inputs, **kwargs))
+            return nn.softmax(self.__call__(inputs, keys))
         else:
-            return nn.sigmoid(self.__call__(inputs, **kwargs))
+            return nn.sigmoid(self.__call__(inputs, keys))
 
     def save(self, path: Union[str, Path], overwrite: bool = False) -> None:
         path = Path(path)
@@ -215,7 +215,7 @@ class LSTMClassifier(NeuralNet):
         return output
 
     @jit
-    def __call__(self, batched_inputs: Tensor, **kwargs: Any) -> Tensor:
+    def __call__(self, batched_inputs: Tensor, keys: Tensor = None) -> Tensor:
 
         batched_h_prev = np.tile(self.h_prev, (batched_inputs.shape[0], 1))
 

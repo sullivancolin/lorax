@@ -11,7 +11,7 @@ from tqdm.autonotebook import tqdm
 
 from colin_net import MLP
 from colin_net.data import BatchIterator
-from colin_net.loss import mean_sqaured_error
+from colin_net.loss import mean_squared_error
 from colin_net.tensor import Tensor
 from colin_net.train import train
 
@@ -46,7 +46,7 @@ def accuracy(actual: Tensor, predicted: Tensor) -> float:
 
 num_epochs = 5000
 progress = train(
-    net, key, num_epochs=num_epochs, iterator=iterator, loss=mean_sqaured_error, lr=0.1,
+    net, key, num_epochs=num_epochs, iterator=iterator, loss=mean_squared_error, lr=0.1,
 )
 
 for i, (epoch, loss, net) in enumerate(tqdm(progress, total=num_epochs)):
