@@ -2,8 +2,7 @@
 Abstract Base class with automatic Pytree registration
 Inspired by from https://github.com/google/jax/issues/2916
 """
-import json
-from typing import Any, List, Tuple, Union
+from typing import Any, List, Tuple, Union, Hashable, Dict
 
 from jax.tree_util import register_pytree_node
 from jax.interpreters.ad import JVPTracer
@@ -15,10 +14,12 @@ __all__ = ["Module"]
 
 
 FlattenedParams = Tuple[Union["Module", Tensor], ...]
-FlattenedMetadata = Tuple[Tuple[Tuple[str, Any]], Tuple[Tuple[str, ...]]]
+FlattenedMetadata = Tuple[Tuple[Tuple[str, Hashable]], Tuple[Tuple[str, ...]]]
 
 
 class Module(BaseModel):
+    differentiable: bool = True
+
     def __init_subclass__(cls, is_abstract: bool = False, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)  # type: ignore
         if not is_abstract:
@@ -30,10 +31,34 @@ class Module(BaseModel):
         json_encoders = {Tensor: lambda t: f"shape={t.shape}"}
 
     def json(self, *args: Any, **kwargs: Any) -> str:
-        return json.dumps({self.__class__.__name__: json.loads(super().json())})
+        return super().json(indent=4)
+
+    def _normal_dict(self) -> Dict[str, Any]:
+        return dict(
+            self._iter(
+                to_dict=True,
+                by_alias=False,
+                include=None,
+                exclude=None,
+                exclude_unset=False,
+                exclude_defaults=False,
+                exclude_none=False,
+            )
+        )
+
+    def dict(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+        return {self.__class__.__name__: super().dict()}
 
     def __repr__(self) -> str:
+        return f"<{self.__class__.__name__}>"
+
+    def __str__(self) -> str:
         return self.json()
+
+    def replace(self, **updates: Any) -> BaseModel:
+        self_dict = self._normal_dict()
+        self_dict.update(updates)
+        return self.__class__(**self_dict)
 
     def tree_flatten(
         self,
@@ -43,6 +68,9 @@ class Module(BaseModel):
         fields = self.__fields__
         params = []
         param_metadata = []
+        if self.differentiable is False:
+            return (), (tuple((key, getattr(self, key)) for key in fields), ())  # type: ignore
+
         for key in fields:
             val = getattr(self, key)
             if (

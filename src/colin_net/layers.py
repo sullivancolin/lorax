@@ -77,8 +77,8 @@ class Linear(Layer):
     def initialize(
         cls,
         *,
-        input_size: int,
-        output_size: int,
+        input_dim: int,
+        output_dim: int,
         key: Tensor,
         initializer: InitializerEnum = InitializerEnum.normal,
     ) -> "Linear":
@@ -88,8 +88,8 @@ class Linear(Layer):
                 f"initializer: {initializer} not in {InitializerEnum.__members__.values()}"
             )
         return cls(
-            w=INITIALIZERS[initializer](key, shape=(output_size, input_size)),
-            b=np.zeros(shape=(output_size,)),
+            w=INITIALIZERS[initializer](key, shape=(output_dim, input_dim)),
+            b=np.zeros(shape=(output_dim,)),
         )
 
 

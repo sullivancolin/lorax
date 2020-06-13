@@ -35,13 +35,6 @@ class NeuralNet(Layer, is_abstract=True):
     def __call__(self, inputs: Tensor, **kwargs: Any) -> Tensor:
         raise NotImplementedError
 
-    @jit
-    def predict_proba(self, inputs: Tensor, keys: Tensor = None) -> Tensor:
-        if self.output_dim > 1:
-            return nn.softmax(self.__call__(inputs, keys))
-        else:
-            return nn.sigmoid(self.__call__(inputs, keys))
-
     def save(self, path: Union[str, Path], overwrite: bool = False) -> None:
         path = Path(path)
         if path.suffix != suffix:
@@ -77,8 +70,10 @@ class MLP(NeuralNet):
     @jit
     def predict(self, single_input: Tensor, key: Tensor = None) -> Tensor:
         """Predict for a single instance by iterating over all the layers"""
+
         for layer in self.layers:
-            single_input = layer(single_input, key=key)
+            key, subkey = random.split(key)
+            single_input = layer(single_input, key=subkey)
         return single_input
 
     @jit
@@ -86,6 +81,13 @@ class MLP(NeuralNet):
         """Batched Predictions"""
 
         return vmap(self.predict)(batched_inputs, batched_keys)
+
+    @jit
+    def predict_proba(self, inputs: Tensor, keys: Tensor = None) -> Tensor:
+        if self.output_dim > 1:
+            return nn.softmax(self.__call__(inputs, keys))
+        else:
+            return nn.sigmoid(self.__call__(inputs, keys))
 
     @classmethod
     def create_mlp(
@@ -103,8 +105,8 @@ class MLP(NeuralNet):
         key, subkey = random.split(key)
         layers: List[Layer] = [
             Linear.initialize(
-                input_size=input_dim,
-                output_size=hidden_dim,
+                input_dim=input_dim,
+                output_dim=hidden_dim,
                 key=subkey,
                 initializer=initializer,
             ),
@@ -117,8 +119,8 @@ class MLP(NeuralNet):
             key, subkey = random.split(key)
             layers.append(
                 Linear.initialize(
-                    input_size=hidden_dim,
-                    output_size=hidden_dim,
+                    input_dim=hidden_dim,
+                    output_dim=output_dim,
                     key=subkey,
                     initializer=initializer,
                 )
@@ -130,8 +132,8 @@ class MLP(NeuralNet):
         key, subkey = random.split(key)
         layers.append(
             Linear.initialize(
-                input_size=hidden_dim,
-                output_size=output_dim,
+                input_dim=hidden_dim,
+                output_dim=output_dim,
                 key=subkey,
                 initializer=initializer,
             )
@@ -174,7 +176,7 @@ class LSTMClassifier(NeuralNet):
 
         key, subkey = random.split(key)
         linear = Linear.initialize(
-            input_size=hidden_dim, output_size=output_dim, key=subkey
+            input_dim=hidden_dim, output_dim=output_dim, key=subkey
         )
 
         h_prev = np.zeros(shape=(hidden_dim,))

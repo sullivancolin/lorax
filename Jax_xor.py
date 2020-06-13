@@ -27,14 +27,21 @@ targets = np.array([[1, 0], [0, 1], [0, 1], [1, 0]])
 # Generate seed for Reproducible Random Numbers
 key = random.PRNGKey(42)
 
+key, subkey = random.split(key)
 
 # Create NeuralNet Instance
 net = MLP.create_mlp(
-    input_dim=2, output_dim=2, hidden_dim=2, key=key, dropout_keep=None, num_hidden=2,
+    input_dim=2,
+    output_dim=2,
+    hidden_dim=2,
+    key=subkey,
+    dropout_keep=None,
+    num_hidden=3,
 )
 
+key, subkey = random.split(key)
 # Create an iterator over the input data
-iterator = BatchIterator(inputs, targets, key)
+iterator = BatchIterator(inputs, targets, subkey)
 
 
 # define accuracy calculation

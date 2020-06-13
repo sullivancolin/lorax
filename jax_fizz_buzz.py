@@ -72,7 +72,7 @@ num_epochs = 5000
 progress = train(
     net,
     key=key,
-    loss=mean_sqaured_error,
+    loss=mean_squared_error,
     iterator=iterator,
     num_epochs=num_epochs,
     lr=0.1,

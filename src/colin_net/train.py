@@ -6,7 +6,6 @@ from typing import Iterator, Tuple, Union
 
 import jax.numpy as np
 from jax import jit, random, value_and_grad
-from jax.experimental.optimizers import adam
 from jax.tree_util import tree_multimap
 from tensorboardX import SummaryWriter
 
@@ -40,11 +39,6 @@ def train(
         epoch_loss = 0.0
         for batch in iterator:
 
-            # batch_loss, grads = value_grad_fn(
-            #     net, keys=None, inputs=batch.inputs, targets=batch.targets
-            # )
-            # opt_state = update_fun(update_count, grads, opt_state)
-            # update_count += 1
             num_keys = batch.inputs.shape[0]
             keys = random.split(key, num_keys + 1)
             key = keys[0]
@@ -54,8 +48,8 @@ def train(
             epoch_loss += batch_loss
 
             net = tree_multimap(sgd_update_combiner, net, grads)
-            # net = get_params(opt_state)
-        # Must return net other as it has been reinstantiated, not mutated.
+
+        # Must return net as it has been reinstantiated, not mutated.
         epoch_loss = float(epoch_loss) / iterator.len
 
         yield (epoch, epoch_loss, net)

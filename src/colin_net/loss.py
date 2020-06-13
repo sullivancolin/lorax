@@ -27,7 +27,7 @@ def mean_squared_error(
     model: NeuralNet, keys: Tensor, inputs: Tensor, targets: Tensor
 ) -> float:
 
-    predicted = model(inputs, keys)
+    predicted = model(inputs, batched_keys=keys)
     return np.mean((predicted - targets) ** 2)
 
 
