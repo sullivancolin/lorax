@@ -23,6 +23,9 @@ class DataIterator:
     def __iter__(self) -> Iterator[Batch]:
         raise NotImplementedError
 
+    def __len__(self) -> int:
+        raise NotImplementedError
+
 
 class BatchIterator(DataIterator):
     def __init__(

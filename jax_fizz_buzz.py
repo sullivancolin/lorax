@@ -70,12 +70,7 @@ def accuracy(actual: Tensor, predicted: Tensor) -> float:
 num_epochs = 5000
 
 progress = train(
-    net,
-    key=key,
-    loss=mean_squared_error,
-    iterator=iterator,
-    num_epochs=num_epochs,
-    lr=0.1,
+    net, loss=mean_squared_error, iterator=iterator, num_epochs=num_epochs, lr=0.1,
 )
 
 points = []
@@ -86,10 +81,9 @@ for i, (epoch, loss, net) in enumerate(tqdm(progress, total=num_epochs)):
     if i % 100 == 0:
         net.eval()
         print(epoch, loss)
-        keys = random.split(key, num=inputs.shape[0])
-        predicted = net.predict_proba(inputs, keys)
+        predicted = net.predict_proba(inputs)
         acc_metric = accuracy(targets, predicted)
-        test_predicted = net.predict_proba(test_X, keys[: len(test_X)])
+        test_predicted = net.predict_proba(test_X)
         test_acc = accuracy(test_y, test_predicted)
         print(f"Train Accuracy: {acc_metric}")
         print(f"Test Accuracy: {test_acc}")
@@ -105,7 +99,7 @@ for i, (epoch, loss, net) in enumerate(tqdm(progress, total=num_epochs)):
 
     points.append([epoch, loss])
     net.eval()
-    eval_loss = mean_squared_error(net, keys[: len(test_X)], test_X, test_y)
+    eval_loss = mean_squared_error(net, test_X, test_y)
     net.train()
     eval_points.append(eval_loss)
     test_writer.add_scalar("loss", float(eval_loss), i)
@@ -117,9 +111,8 @@ test_writer.close()
 train_writer.close()
 
 net.save("jax_fizz_buzz.pkl", overwrite=True)
-keys = random.split(key, num=test_X.shape[0])
 
-test_predictions = net.predict_proba(test_X, keys)
+test_predictions = net.predict_proba(test_X)
 
 test_accuracy = accuracy(test_y, test_predictions)
 

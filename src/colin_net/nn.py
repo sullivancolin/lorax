@@ -2,9 +2,10 @@
 A NeuralNet is just a collection of layers.
 It behaves a lot like a layer itself.
 """
+import functools
 import pickle
 from pathlib import Path
-from typing import Any, List, Union
+from typing import List, Union
 
 import jax.numpy as np
 from jax import jit, lax, nn, random, vmap
@@ -22,6 +23,7 @@ from colin_net.layers import (
     Mode,
 )
 from colin_net.tensor import Tensor
+from colin_net.base import RNGWrapper
 
 suffix = ".pkl"
 
@@ -32,7 +34,7 @@ class NeuralNet(Layer, is_abstract=True):
     """Abstract Class for NeuralNet. Enforces subclasses to implement
     __call__, tree_flatten, tree_unflatten, save, load and registered as Pytree"""
 
-    def __call__(self, inputs: Tensor, **kwargs: Any) -> Tensor:
+    def __call__(self, inputs: Tensor) -> Tensor:
         raise NotImplementedError
 
     def save(self, path: Union[str, Path], overwrite: bool = False) -> None:
@@ -67,27 +69,26 @@ class MLP(NeuralNet):
     input_dim: int
     output_dim: int
 
-    @jit
-    def predict(self, single_input: Tensor, key: Tensor = None) -> Tensor:
+    @functools.partial(jit, static_argnums=(0,))
+    def predict(self, single_input: Tensor) -> Tensor:
         """Predict for a single instance by iterating over all the layers"""
 
         for layer in self.layers:
-            key, subkey = random.split(key)
-            single_input = layer(single_input, key=subkey)
+            single_input = layer(single_input)
         return single_input
 
-    @jit
-    def __call__(self, batched_inputs: Tensor, batched_keys: Tensor = None) -> Tensor:
+    @functools.partial(jit, static_argnums=(0,))
+    def __call__(self, batched_inputs: Tensor) -> Tensor:
         """Batched Predictions"""
 
-        return vmap(self.predict)(batched_inputs, batched_keys)
+        return vmap(self.predict)(batched_inputs)
 
-    @jit
-    def predict_proba(self, inputs: Tensor, keys: Tensor = None) -> Tensor:
+    @functools.partial(jit, static_argnums=(0,))
+    def predict_proba(self, inputs: Tensor) -> Tensor:
         if self.output_dim > 1:
-            return nn.softmax(self.__call__(inputs, keys))
+            return nn.softmax(self.__call__(inputs))
         else:
-            return nn.sigmoid(self.__call__(inputs, keys))
+            return nn.sigmoid(self.__call__(inputs))
 
     @classmethod
     def create_mlp(
@@ -113,21 +114,25 @@ class MLP(NeuralNet):
             ActivationLayer.initialize(activation),
         ]
         if dropout_keep:
-            layers.append(Dropout(keep=dropout_keep))
+            key, subkey = random.split(key)
+            rng = RNGWrapper.from_prng(subkey)
+            layers.append(Dropout(rng=rng, keep=dropout_keep))
 
         for _ in range(num_hidden - 2):
             key, subkey = random.split(key)
             layers.append(
                 Linear.initialize(
                     input_dim=hidden_dim,
-                    output_dim=output_dim,
+                    output_dim=hidden_dim,
                     key=subkey,
                     initializer=initializer,
                 )
             )
             layers.append(ActivationLayer.initialize(activation))
             if dropout_keep:
-                layers.append(Dropout(keep=dropout_keep))
+                key, subkey = random.split(key)
+                rng = RNGWrapper.from_prng(subkey)
+                layers.append(Dropout(rng=rng, keep=dropout_keep))
 
         key, subkey = random.split(key)
         layers.append(
@@ -143,13 +148,16 @@ class MLP(NeuralNet):
     def eval(self) -> None:
         for i, layer in enumerate(self.layers):
             if isinstance(layer, Dropout):
-                newlayer = Dropout(keep=layer.keep, mode=Mode.eval)
+                newlayer = Dropout(rng=layer.rng, keep=layer.keep, mode=Mode.eval)
                 self.layers[i] = newlayer
 
     def train(self) -> None:
         for i, layer in enumerate(self.layers):
             if isinstance(layer, Dropout):
-                newlayer = Dropout(keep=layer.keep, mode=Mode.train)
+                key, subkey = random.split(layer.rng.to_prng())
+                newlayer = Dropout(
+                    rng=RNGWrapper.from_prng(subkey), keep=layer.keep, mode=Mode.train
+                )
                 self.layers[i] = newlayer
 
 
@@ -158,8 +166,8 @@ class LSTMClassifier(NeuralNet):
     embeddings: Embedding
     cell: LSTMCell
     output_layer: Linear
-    h_prev = Tensor
-    c_prev = Tensor
+    h_prev: Tensor
+    c_prev: Tensor
     output_dim: int
 
     @classmethod
@@ -217,13 +225,20 @@ class LSTMClassifier(NeuralNet):
         return output
 
     @jit
-    def __call__(self, batched_inputs: Tensor, keys: Tensor = None) -> Tensor:
+    def __call__(self, batched_inputs: Tensor) -> Tensor:
 
         batched_h_prev = np.tile(self.h_prev, (batched_inputs.shape[0], 1))
 
         batched_c_prev = np.tile(self.c_prev, (batched_inputs.shape[0], 1))
 
         return vmap(self.predict)(batched_inputs, batched_h_prev, batched_c_prev)
+
+    @jit
+    def predict_proba(self, inputs: Tensor) -> Tensor:
+        if self.output_dim > 1:
+            return nn.softmax(self.__call__(inputs))
+        else:
+            return nn.sigmoid(self.__call__(inputs))
 
 
 __all__ = ["NeuralNet", "MLP", "LSTMClassifier"]

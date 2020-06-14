@@ -93,22 +93,20 @@ now = datetime.now().isoformat()
 train_writer = SummaryWriter(f"lstm_runs/train-{now}")
 test_writer = SummaryWriter(f"lstm_runs/test-{now}")
 
+
 # define accuracy calculation
 def accuracy(actual: Tensor, predicted: Tensor) -> float:
     return np.mean(np.argmax(actual, axis=1) == np.argmax(predicted, axis=1))
 
 
 num_epochs = 100
-
 progress = train(
     lstm,
-    key=key,
     loss=mean_squared_error,
     iterator=train_iterator,
     num_epochs=num_epochs,
     lr=0.001,
 )
-
 
 for epoch, loss, lstm in tqdm(progress, total=num_epochs):
 
@@ -120,8 +118,8 @@ for epoch, loss, lstm in tqdm(progress, total=num_epochs):
         eval_probs = []
         eval_labels = []
         for batch in test_iterator:
-            test_loss = mean_sqaured_error(
-                lstm, keys=None, inputs=batch.inputs, targets=batch.targets
+            test_loss = mean_squared_error(
+                lstm, inputs=batch.inputs, targets=batch.targets
             )
             eval_loss += test_loss
 

@@ -6,12 +6,12 @@ a neural net might look like
 inputs -> Linear -> Tanh -> Linear -> output
 """
 from enum import Enum
-from typing import Any, Tuple
+from typing import Tuple
 
 import jax.numpy as np
 from jax import jit, nn, ops, random
 
-from colin_net.base import Module
+from colin_net.base import Module, RNGWrapper
 from colin_net.tensor import Tensor
 
 
@@ -39,7 +39,7 @@ class Layer(Module, is_abstract=True):
     """Abstract Class for Layers. Enforces subclasses to implement
     __call__"""
 
-    def __call__(self, inputs: Tensor, **kwargs: Any) -> Tensor:
+    def __call__(self, inputs: Tensor) -> Tensor:
         raise NotImplementedError
 
 
@@ -68,7 +68,7 @@ class Linear(Layer):
     b: Tensor
 
     @jit
-    def __call__(self, inputs: Tensor, **kwargs: Any) -> Tensor:
+    def __call__(self, inputs: Tensor) -> Tensor:
         """outputs = np.dot(w, inputs) + b in single instance notation."""
 
         return np.dot(self.w, inputs) + self.b
@@ -97,27 +97,19 @@ class Dropout(Layer):
     """Dropout Layer. If in train mode, keeps input activations at given probability rate,
     otherwise returns inputs directly"""
 
+    rng: RNGWrapper
     keep: float = 0.5
     mode: Mode = Mode.train
 
     @jit
-    def __call__(self, inputs: Tensor, **kwargs: Any) -> Tensor:
+    def __call__(self, inputs: Tensor) -> Tensor:
         """If in train mode, keeps input activations at rate,
         otherwise returns directly"""
 
         if self.mode == Mode.eval:
             return inputs
-
-        key = kwargs.get("key", None)
-        if key is None and self.mode != Mode.eval:
-            msg = (
-                "Dropout layer requires __call__ to be called with a PRNG key "
-                "argument. That is, instead of `__call__(inputs)`, use "
-                "it like `__call__(inputs, key=key)` where `key` is a "
-                "jax.random.PRNGKey value."
-            )
-            raise ValueError(msg)
-        mask = random.bernoulli(key, self.keep, inputs.shape)
+        rng_key = self.rng.to_prng()
+        mask = random.bernoulli(rng_key, self.keep, inputs.shape)
         return np.where(mask, inputs / self.keep, 0)
 
 
@@ -126,7 +118,7 @@ class Embedding(Layer):
     embedding_matrix: Tensor
 
     @jit
-    def __call__(self, inputs: Tensor, **kwargs: Any) -> Tensor:
+    def __call__(self, inputs: Tensor) -> Tensor:
         return self.embedding_matrix[inputs]
 
     @classmethod
@@ -176,7 +168,7 @@ class LSTMCell(Layer):
 
     @jit
     def __call__(
-        self, state: Tuple[Tensor, Tensor], inputs: Tensor, **kwargs: Any
+        self, state: Tuple[Tensor, Tensor], inputs: Tensor
     ) -> Tuple[Tuple[Tensor, Tensor], Tensor]:
 
         h_prev, c_prev = state
@@ -190,43 +182,43 @@ class LSTMCell(Layer):
         o = nn.sigmoid(np.dot(self.Wo, concat_vec) + self.bo)
         h = o * np.tanh(c)
 
-        # hiddent state vector is copied as out_put
+        # hiddent state vector is copied as output
         return (h, c), h
 
 
 class Tanh(ActivationLayer):
     @jit
-    def __call__(self, inputs: Tensor, **kwargs: Any) -> Tensor:
+    def __call__(self, inputs: Tensor) -> Tensor:
         return np.tanh(inputs)
 
 
 class Relu(ActivationLayer):
     @jit
-    def __call__(self, inputs: Tensor, **kwargs: Any) -> Tensor:
+    def __call__(self, inputs: Tensor) -> Tensor:
         return nn.relu(inputs)
 
 
 class LeakyRelu(ActivationLayer):
     @jit
-    def __call__(self, inputs: Tensor, **kwargs: Any) -> Tensor:
+    def __call__(self, inputs: Tensor) -> Tensor:
         return nn.leaky_relu(inputs)
 
 
 class Selu(ActivationLayer):
     @jit
-    def __call__(self, inputs: Tensor, **kwargs: Any) -> Tensor:
+    def __call__(self, inputs: Tensor) -> Tensor:
         return nn.selu(inputs)
 
 
 class Sigmoid(ActivationLayer):
     @jit
-    def __call__(self, inputs: Tensor, **kwargs: Any) -> Tensor:
+    def __call__(self, inputs: Tensor) -> Tensor:
         return nn.sigmoid(inputs)
 
 
 class Softmax(ActivationLayer):
     @jit
-    def __call__(self, inputs: Tensor, **kwargs: Any) -> Tensor:
+    def __call__(self, inputs: Tensor) -> Tensor:
         return nn.softmax(inputs)
 
 

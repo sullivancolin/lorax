@@ -23,19 +23,17 @@ class LossEnum(str, Enum):
 
 
 @jit
-def mean_squared_error(
-    model: NeuralNet, keys: Tensor, inputs: Tensor, targets: Tensor
-) -> float:
+def mean_squared_error(model: NeuralNet, inputs: Tensor, targets: Tensor) -> float:
 
-    predicted = model(inputs, batched_keys=keys)
+    predicted = model(inputs)
     return np.mean((predicted - targets) ** 2)
 
 
 @jit
 def binary_cross_entropy_loss(
-    model: NeuralNet, keys: Tensor, inputs: Tensor, targets: Tensor, tol: float = 1e-10
+    model: NeuralNet, inputs: Tensor, targets: Tensor, tol: float = 1e-10
 ) -> float:
-    predicted = model(inputs, batched_keys=keys)
+    predicted = model(inputs)
 
     return -np.mean(
         targets * np.log(np.maximum(tol, predicted))

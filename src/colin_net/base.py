@@ -2,11 +2,14 @@
 Abstract Base class with automatic Pytree registration
 Inspired by from https://github.com/google/jax/issues/2916
 """
-from typing import Any, List, Tuple, Union, Hashable, Dict
+from typing import Any, List, Tuple, Hashable, Dict, Union
 
 from jax.tree_util import register_pytree_node
 from jax.interpreters.ad import JVPTracer
+from jax import random
 from pydantic import BaseModel
+from numpy import ndarray
+import jax.numpy as np
 
 from colin_net.tensor import Tensor
 
@@ -14,7 +17,9 @@ __all__ = ["Module"]
 
 
 FlattenedParams = Tuple[Union["Module", Tensor], ...]
-FlattenedMetadata = Tuple[Tuple[Tuple[str, Hashable]], Tuple[Tuple[str, ...]]]
+FlattenedRemainder = Tuple[Tuple[str, Hashable], ...]
+FlattenedMetadata = Tuple[str, ...]
+FlattenedAux = Tuple[FlattenedRemainder, FlattenedMetadata]
 
 
 class Module(BaseModel):
@@ -28,7 +33,10 @@ class Module(BaseModel):
     class Config:
         allow_mutation = False
         arbitrary_types_allowed = True
-        json_encoders = {Tensor: lambda t: f"shape={t.shape}"}
+        json_encoders = {
+            Tensor: lambda t: f"shape={t.shape}",
+            ndarray: lambda a: f"shape={a.shape}",
+        }
 
     def json(self, *args: Any, **kwargs: Any) -> str:
         return super().json(indent=4)
@@ -63,14 +71,13 @@ class Module(BaseModel):
     def tree_flatten(
         self,
     ) -> Tuple[
-        FlattenedParams, FlattenedMetadata,
+        FlattenedParams, FlattenedAux,
     ]:
         fields = self.__fields__
         params = []
         param_metadata = []
         if self.differentiable is False:
             return (), (tuple((key, getattr(self, key)) for key in fields), ())  # type: ignore
-
         for key in fields:
             val = getattr(self, key)
             if (
@@ -92,9 +99,7 @@ class Module(BaseModel):
         return tuple(params), (flattened_remainder, flattened_metadata)  # type: ignore
 
     @classmethod
-    def tree_unflatten(
-        cls, aux: FlattenedMetadata, params: FlattenedParams,
-    ) -> "Module":
+    def tree_unflatten(cls, aux: FlattenedAux, params: FlattenedParams,) -> "Module":
         # breakpoint()
         flattened_remainder, flattened_metadata = aux
 
@@ -102,7 +107,30 @@ class Module(BaseModel):
 
         param_dict = {key: val for (key, val) in zip(flattened_metadata, params)}
 
-        constructor_dict = {**param_dict, **metadata_dict}  # type: ignore
+        constructor_dict = {**param_dict, **metadata_dict}
+        if "key" in constructor_dict:
+            rngwrapper: RNGWrapper = constructor_dict["key"]
+
+            newwrapper = RNGWrapper.generate(rngwrapper)
+            constructor_dict["key"] = newwrapper
 
         # Disable validation from unflattening for speed up
         return cls.construct(**constructor_dict)  # type: ignore
+
+
+class RNGWrapper(Module):
+    int_1: int
+    int_2: int
+
+    def to_prng(self) -> Tensor:
+        return np.array([self.int_1, self.int_2], dtype=np.uint32)
+
+    @classmethod
+    def from_prng(cls, key: Union[ndarray, Tensor]) -> "RNGWrapper":
+        return cls(int_1=key[0], int_2=key[1])
+
+    @classmethod
+    def generate(cls, other: "RNGWrapper") -> "RNGWrapper":
+        orig_key = np.array([other.int_1, other.int_2], dtype=np.uint32)
+        key, subkey = random.split(orig_key)
+        return cls(int_1=subkey[0], int_2=subkey[1])

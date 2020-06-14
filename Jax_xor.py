@@ -50,10 +50,9 @@ def accuracy(actual: Tensor, predicted: Tensor) -> float:
 
 
 # Start training process
-
 num_epochs = 5000
 progress = train(
-    net, key, num_epochs=num_epochs, iterator=iterator, loss=mean_squared_error, lr=0.1,
+    net, num_epochs=num_epochs, iterator=iterator, loss=mean_squared_error, lr=0.1,
 )
 
 for i, (epoch, loss, net) in enumerate(tqdm(progress, total=num_epochs)):
@@ -62,8 +61,7 @@ for i, (epoch, loss, net) in enumerate(tqdm(progress, total=num_epochs)):
     if i % 5 == 0:
         print(epoch, loss)
         net.eval()
-        keys = random.split(key, num=inputs.shape[0])
-        predicted = net.predict_proba(inputs, keys)
+        predicted = net.predict_proba(inputs)
         acc_metric = float(accuracy(targets, predicted))
         writer.add_scalar("train_accuracy", acc_metric, i)
         print(f"Accuracy: {acc_metric}")
@@ -77,8 +75,7 @@ net.save("xor_model.pkl", overwrite=True)
 writer.close()
 
 # Display Predictions
-keys = random.split(key, num=inputs.shape[0])
-probabilties = net.predict_proba(inputs, keys)
+probabilties = net.predict_proba(inputs)
 for gold, prob, pred in zip(targets, probabilties, np.argmax(probabilties, axis=1)):
 
     print(gold, prob, pred)

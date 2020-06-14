@@ -19,7 +19,6 @@ from colin_net.tensor import Tensor
 
 def train(
     net: NeuralNet,
-    key: Tensor,
     num_epochs: int,
     iterator: DataIterator,
     loss: Loss,
@@ -32,25 +31,16 @@ def train(
 
     value_grad_fn = value_and_grad(loss)
 
-    # init_fun, update_fun, get_params = adam(step_size=lr)
-    # opt_state = init_fun(net)
-    # update_count = 0
     for epoch in range(num_epochs):
         epoch_loss = 0.0
         for batch in iterator:
 
-            num_keys = batch.inputs.shape[0]
-            keys = random.split(key, num_keys + 1)
-            key = keys[0]
-            subkeys = keys[1:]
-
-            batch_loss, grads = value_grad_fn(net, subkeys, batch.inputs, batch.targets)
+            batch_loss, grads = value_grad_fn(net, batch.inputs, batch.targets)
             epoch_loss += batch_loss
-
             net = tree_multimap(sgd_update_combiner, net, grads)
 
         # Must return net as it has been reinstantiated, not mutated.
-        epoch_loss = float(epoch_loss) / iterator.len
+        epoch_loss = float(epoch_loss) / len(iterator)
 
         yield (epoch, epoch_loss, net)
 
@@ -110,13 +100,7 @@ class Trainer:
         for epoch in range(self.num_epochs):
             epoch_losses = []
             for batch in iterator:
-                num_keys = batch.inputs.shape[0]
-                keys = random.split(self.key, num_keys + 1)
-                self.key = keys[0]
-                subkeys = keys[1:]
-                batch_loss, self.net = self.optimzer.step(
-                    subkeys, batch.inputs, batch.targets
-                )
+                batch_loss, self.net = self.optimzer.step(batch.inputs, batch.targets)
                 epoch_losses.append(float(batch_loss))
 
             # Must return net other as it has been reinstantiated, not mutated.
