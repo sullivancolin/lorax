@@ -31,12 +31,7 @@ key, subkey = random.split(key)
 
 # Create NeuralNet Instance
 net = MLP.create_mlp(
-    input_dim=2,
-    output_dim=2,
-    hidden_dim=2,
-    key=subkey,
-    dropout_keep=None,
-    num_hidden=3,
+    input_dim=2, output_dim=2, hidden_dim=2, key=subkey, dropout_keep=0.8, num_hidden=2,
 )
 
 key, subkey = random.split(key)

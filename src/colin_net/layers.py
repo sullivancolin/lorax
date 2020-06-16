@@ -50,28 +50,33 @@ class ActivationEnum(str, Enum):
     selu = "selu"
     sigmoid = "sigmoid"
     softmax = "softmax"
+    identity = "identity"
 
 
-class ActivationLayer(Layer, is_abstract=True):
-    """Abstract Class for Activation Layers."""
-
-    @staticmethod
-    def initialize(activation: ActivationEnum) -> "ActivationLayer":
-        return ACTIVATIONS[activation]()
+ACTIVATIONS = {
+    "tanh": np.tanh,
+    "relu": nn.relu,
+    "leaky_relu": nn.leaky_relu,
+    "selu": nn.selu,
+    "sigmoid": nn.sigmoid,
+    "softmax": nn.softmax,
+    "identity": lambda x: x,
+}
 
 
 class Linear(Layer):
     """Dense Linear Layer.
-    Computes output = np.dot(w, inputs) + b"""
+    Computes output = activation(np.dot(w, inputs) + b)"""
 
     w: Tensor
     b: Tensor
+    activation: ActivationEnum = ActivationEnum.identity
 
     @jit
     def __call__(self, inputs: Tensor) -> Tensor:
         """outputs = np.dot(w, inputs) + b in single instance notation."""
 
-        return np.dot(self.w, inputs) + self.b
+        return ACTIVATIONS[self.activation](np.dot(self.w, inputs) + self.b)
 
     @classmethod
     def initialize(
@@ -80,6 +85,7 @@ class Linear(Layer):
         input_dim: int,
         output_dim: int,
         key: Tensor,
+        activation: ActivationEnum = ActivationEnum.identity,
         initializer: InitializerEnum = InitializerEnum.normal,
     ) -> "Linear":
         """Factory for new Linear from input and output dimentsions"""
@@ -87,10 +93,24 @@ class Linear(Layer):
             raise ValueError(
                 f"initializer: {initializer} not in {InitializerEnum.__members__.values()}"
             )
+        if activation not in ActivationEnum.__members__:
+            raise ValueError(
+                f"Actication: {activation} not in {ActivationEnum.__members__.values()}"
+            )
         return cls(
             w=INITIALIZERS[initializer](key, shape=(output_dim, input_dim)),
             b=np.zeros(shape=(output_dim,)),
+            activation=activation,
         )
+
+    def tree_flatten(self) -> Tuple[Tuple[Tensor, Tensor], Tuple[ActivationEnum]]:
+        return (self.w, self.b), (self.activation,)
+
+    @classmethod
+    def tree_unflatten(
+        cls, aux: Tuple[ActivationEnum], params: Tuple[Tensor, Tensor]
+    ) -> "Linear":
+        return cls.construct(w=params[0], b=params[1], activation=aux[0])
 
 
 class Dropout(Layer):
@@ -111,6 +131,24 @@ class Dropout(Layer):
         rng_key = self.rng.to_prng()
         mask = random.bernoulli(rng_key, self.keep, inputs.shape)
         return np.where(mask, inputs / self.keep, 0)
+
+    def to_eval(self) -> "Dropout":
+        return Dropout(rng=self.rng, keep=self.keep, mode=Mode.eval)
+
+    def to_train(self) -> "Dropout":
+        return Dropout(rng=self.rng.split(), keep=self.keep, mode=Mode.train)
+
+    def randomize(self) -> "Dropout":
+        return Dropout(rng=self.rng.split(), keep=self.keep, mode=self.mode)
+
+    def tree_flatten(self) -> Tuple[Tuple[None], Tuple[RNGWrapper, float, Mode]]:
+        return (None,), (self.rng, self.keep, self.mode)
+
+    @classmethod
+    def tree_unflatten(
+        cls, aux: Tuple[RNGWrapper, float, Mode], params: Tuple[None]
+    ) -> "Dropout":
+        return cls.construct(rng=aux[0], keep=aux[1], mode=aux[2])
 
 
 class Embedding(Layer):
@@ -133,9 +171,15 @@ class Embedding(Layer):
         vectors = ops.index_update(vectors, ops.index[0, :], 0.0)
         return cls(embedding_matrix=vectors)
 
+    def tree_flatten(self) -> Tuple[Tuple[Tensor], None]:
+        return (self.embedding_matrix), None
+
+    @classmethod
+    def tree_unflatten(cls, aux: None, params: Tuple[Tensor]) -> "Embedding":
+        return cls.construct(embedding_matrix=params[0])
+
 
 class LSTMCell(Layer):
-
     Wf: Tensor
     bf: Tensor
     Wi: Tensor
@@ -172,6 +216,7 @@ class LSTMCell(Layer):
     ) -> Tuple[Tuple[Tensor, Tensor], Tensor]:
 
         h_prev, c_prev = state
+        breakpoint()
         concat_vec = np.hstack((inputs, h_prev))
 
         f = nn.sigmoid(np.dot(self.Wf, concat_vec) + self.bf)
@@ -182,51 +227,15 @@ class LSTMCell(Layer):
         o = nn.sigmoid(np.dot(self.Wo, concat_vec) + self.bo)
         h = o * np.tanh(c)
 
-        # hiddent state vector is copied as output
+        # hidden state vector is copied as output
         return (h, c), h
 
+    def tree_flatten(self) -> Tuple[Tuple[Tensor, ...], None]:
+        return (
+            (self.Wf, self.bf, self.Wi, self.bi, self.Wc, self.bc, self.Wo, self.bo,),
+            None,
+        )
 
-class Tanh(ActivationLayer):
-    @jit
-    def __call__(self, inputs: Tensor) -> Tensor:
-        return np.tanh(inputs)
-
-
-class Relu(ActivationLayer):
-    @jit
-    def __call__(self, inputs: Tensor) -> Tensor:
-        return nn.relu(inputs)
-
-
-class LeakyRelu(ActivationLayer):
-    @jit
-    def __call__(self, inputs: Tensor) -> Tensor:
-        return nn.leaky_relu(inputs)
-
-
-class Selu(ActivationLayer):
-    @jit
-    def __call__(self, inputs: Tensor) -> Tensor:
-        return nn.selu(inputs)
-
-
-class Sigmoid(ActivationLayer):
-    @jit
-    def __call__(self, inputs: Tensor) -> Tensor:
-        return nn.sigmoid(inputs)
-
-
-class Softmax(ActivationLayer):
-    @jit
-    def __call__(self, inputs: Tensor) -> Tensor:
-        return nn.softmax(inputs)
-
-
-ACTIVATIONS = {
-    "tanh": Tanh,
-    "relu": Relu,
-    "leaky_relu": LeakyRelu,
-    "selu": Selu,
-    "sigmoid": Sigmoid,
-    "softmax": Softmax,
-}
+    @classmethod
+    def tree_unflatten(cls, aux: None, params: Tuple[Tensor, ...]) -> "LSTMCell":
+        return cls.construct(**dict(zip(cls.__fields__.keys(), params)))

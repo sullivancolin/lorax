@@ -91,8 +91,8 @@ for i, (epoch, loss, net) in enumerate(tqdm(progress, total=num_epochs)):
         train_writer.add_scalar("accuracy", float(acc_metric), i)
         train_writer.add_histogram("Layer1-w", onp.array(net.layers[0].w), i)
         train_writer.add_histogram("Layer1-b", onp.array(net.layers[0].b), i)
-        train_writer.add_histogram("Layer2-w", onp.array(net.layers[2].w), i)
-        train_writer.add_histogram("Layer2-b", onp.array(net.layers[2].b), i)
+        train_writer.add_histogram("Layer2-w", onp.array(net.layers[1].w), i)
+        train_writer.add_histogram("Layer2-b", onp.array(net.layers[1].b), i)
         if test_acc >= 0.99:
             break
         net.train()

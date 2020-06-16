@@ -8,6 +8,7 @@ import jax.numpy as np
 from jax import jit, random, value_and_grad
 from jax.tree_util import tree_multimap
 from tensorboardX import SummaryWriter
+from tqdm import tqdm
 
 from colin_net.config import ExperimentConfig
 from colin_net.data import DataIterator
@@ -33,7 +34,7 @@ def train(
 
     for epoch in range(num_epochs):
         epoch_loss = 0.0
-        for batch in iterator:
+        for batch in tqdm(iterator):
 
             batch_loss, grads = value_grad_fn(net, batch.inputs, batch.targets)
             epoch_loss += batch_loss
