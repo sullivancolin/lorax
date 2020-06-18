@@ -12,41 +12,33 @@ from tensorboardX import SummaryWriter
 from colin_net.config import ExperimentConfig
 from colin_net.data import DataIterator
 from colin_net.loss import LOSS_FUNCTIONS, Loss
-from colin_net.nn import FeedForwardNet, NeuralNet
-from colin_net.optim import OPTIMIZERS, Optimizer
+from colin_net.nn import MLP, NeuralNet
+from colin_net.optim import OPTIMIZERS, Optimizer, Adam
 from colin_net.tensor import Tensor
 
 
 def train(
     net: NeuralNet,
-    key: Tensor,
     num_epochs: int,
     iterator: DataIterator,
     loss: Loss,
     lr: float = 0.01,
 ) -> Iterator[Tuple[int, float, NeuralNet]]:
-    @jit
-    def sgd_update_combiner(param: Tensor, grad: Tensor, lr: float = lr) -> Tensor:
-        """Convenvience method for performing SGD on custom jax Pytree objects"""
-        return param - (lr * grad)
-
-    value_grad_fn = value_and_grad(loss)
-
+    optimizer = Adam.initialize(net, loss, lr)
     for epoch in range(num_epochs):
-        epoch_losses = []
+        epoch_loss = 0.0
         for batch in iterator:
-            num_keys = batch.inputs.shape[0]
-            keys = random.split(key, num_keys + 1)
-            key = keys[0]
-            subkeys = keys[1:]
-            batch_loss, grads = value_grad_fn(net, subkeys, batch.inputs, batch.targets)
-            epoch_losses.append(float(batch_loss))
 
-            net = tree_multimap(sgd_update_combiner, net, grads)
+            batch_loss, net = optimizer.step(batch.inputs, batch.targets)
 
-        # Must return net other as it has been reinstantiated, not mutated.
-        loss_arr = np.array(epoch_losses)
-        yield (epoch, np.mean(loss_arr), net)
+            # batch_loss, grads = value_grad_fn(net, batch.inputs, batch.targets)
+            epoch_loss += batch_loss
+            # net = tree_multimap(sgd_update_combiner, net, grads)
+
+        # Must return net as it has been reinstantiated, not mutated.
+        epoch_loss = float(epoch_loss) / len(iterator)
+
+        yield (epoch, epoch_loss, net)
 
 
 class Trainer:
@@ -83,7 +75,7 @@ class Trainer:
     @classmethod
     def from_config(cls, config: ExperimentConfig) -> "Trainer":
         key = random.PRNGKey(config.random_seed)
-        net = FeedForwardNet.create_mlp(key=key, **config.net_config.dict())
+        net = MLP.create_mlp(key=key, **config.net_config.dict())
         loss = LOSS_FUNCTIONS[config.loss]
         optimizer = OPTIMIZERS[config.optimizer].initialize(
             net, loss, config.learning_rate
@@ -104,13 +96,7 @@ class Trainer:
         for epoch in range(self.num_epochs):
             epoch_losses = []
             for batch in iterator:
-                num_keys = batch.inputs.shape[0]
-                keys = random.split(self.key, num_keys + 1)
-                self.key = keys[0]
-                subkeys = keys[1:]
-                batch_loss, self.net = self.optimzer.step(
-                    subkeys, batch.inputs, batch.targets
-                )
+                batch_loss, self.net = self.optimzer.step(batch.inputs, batch.targets)
                 epoch_losses.append(float(batch_loss))
 
             # Must return net other as it has been reinstantiated, not mutated.
