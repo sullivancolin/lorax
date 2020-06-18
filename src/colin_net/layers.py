@@ -5,11 +5,13 @@ a neural net might look like
 
 inputs -> Linear -> Tanh -> Linear -> output
 """
+from abc import abstractmethod
 from enum import Enum
 from typing import Tuple
 
 import jax.numpy as np
 from jax import jit, nn, ops, random
+from jax.tree_util import register_pytree_node_class
 
 from colin_net.base import Module, RNGWrapper
 from colin_net.tensor import Tensor
@@ -39,6 +41,7 @@ class Layer(Module, is_abstract=True):
     """Abstract Class for Layers. Enforces subclasses to implement
     __call__"""
 
+    @abstractmethod
     def __call__(self, inputs: Tensor) -> Tensor:
         raise NotImplementedError
 
@@ -179,15 +182,28 @@ class Embedding(Layer):
         return cls.construct(embedding_matrix=params[0])
 
 
-class LSTMCell(Layer):
-    Wf: Tensor
-    bf: Tensor
-    Wi: Tensor
-    bi: Tensor
-    Wc: Tensor
-    bc: Tensor
-    Wo: Tensor
-    bo: Tensor
+@register_pytree_node_class
+class LSTMCell:
+    def __init__(
+        self,
+        Wf: Tensor,
+        bf: Tensor,
+        Wi: Tensor,
+        bi: Tensor,
+        Wc: Tensor,
+        bc: Tensor,
+        Wo: Tensor,
+        bo: Tensor,
+    ):
+
+        self.Wf = Wf
+        self.bf = bf
+        self.Wi = Wi
+        self.bi = bi
+        self.Wc = Wc
+        self.bc = bc
+        self.Wo = Wo
+        self.bo = bo
 
     @classmethod
     def initialize(cls, input_dim: int, hidden_dim: int, key: Tensor) -> "LSTMCell":
@@ -238,7 +254,13 @@ class LSTMCell(Layer):
     @classmethod
     def tree_unflatten(cls, aux: None, params: Tuple[Tensor, ...]) -> "LSTMCell":
 
-        constuctor_dict = dict(
-            zip(("Wf", "bf", "Wi", "bi", "Wc", "bc", "Wo", "bo"), params)
+        return cls(
+            Wf=params[0],
+            bf=params[1],
+            Wi=params[2],
+            bi=params[3],
+            Wc=params[4],
+            bc=params[5],
+            Wo=params[6],
+            bo=params[7],
         )
-        return cls.construct(**constuctor_dict)

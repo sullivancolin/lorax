@@ -8,13 +8,12 @@ import jax.numpy as np
 from jax import jit, random, value_and_grad
 from jax.tree_util import tree_multimap
 from tensorboardX import SummaryWriter
-from tqdm import tqdm
 
 from colin_net.config import ExperimentConfig
 from colin_net.data import DataIterator
 from colin_net.loss import LOSS_FUNCTIONS, Loss
 from colin_net.nn import MLP, NeuralNet
-from colin_net.optim import OPTIMIZERS, Optimizer
+from colin_net.optim import OPTIMIZERS, Optimizer, Adam
 from colin_net.tensor import Tensor
 
 
@@ -25,20 +24,16 @@ def train(
     loss: Loss,
     lr: float = 0.01,
 ) -> Iterator[Tuple[int, float, NeuralNet]]:
-    @jit
-    def sgd_update_combiner(param: Tensor, grad: Tensor, lr: float = lr) -> Tensor:
-        """Convenvience method for performing SGD on custom jax Pytree objects"""
-        return param - (lr * grad)
-
-    value_grad_fn = value_and_grad(loss)
-
+    optimizer = Adam.initialize(net, loss, lr)
     for epoch in range(num_epochs):
         epoch_loss = 0.0
-        for batch in tqdm(iterator):
+        for batch in iterator:
 
-            batch_loss, grads = value_grad_fn(net, batch.inputs, batch.targets)
+            batch_loss, net = optimizer.step(batch.inputs, batch.targets)
+
+            # batch_loss, grads = value_grad_fn(net, batch.inputs, batch.targets)
             epoch_loss += batch_loss
-            net = tree_multimap(sgd_update_combiner, net, grads)
+            # net = tree_multimap(sgd_update_combiner, net, grads)
 
         # Must return net as it has been reinstantiated, not mutated.
         epoch_loss = float(epoch_loss) / len(iterator)

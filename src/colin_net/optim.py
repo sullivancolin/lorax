@@ -1,7 +1,8 @@
 from enum import Enum
-from typing import Any, Callable, Tuple
 from functools import partial
-from jax import value_and_grad, jit
+from typing import Any, Callable, Tuple
+
+from jax import jit, value_and_grad
 from jax.experimental.optimizers import adam
 from jax.tree_util import tree_multimap
 from pydantic import BaseModel

@@ -5,7 +5,7 @@ from typing import Iterator, List, Tuple
 import jax.numpy as np
 import numpy as onp
 import sentencepiece as spm
-from jax import random, disable_jit
+from jax import random
 from tensorboardX import SummaryWriter
 from tqdm.autonotebook import tqdm
 
