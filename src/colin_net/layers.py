@@ -172,7 +172,7 @@ class Embedding(Layer):
         return cls(embedding_matrix=vectors)
 
     def tree_flatten(self) -> Tuple[Tuple[Tensor], None]:
-        return (self.embedding_matrix), None
+        return (self.embedding_matrix,), None
 
     @classmethod
     def tree_unflatten(cls, aux: None, params: Tuple[Tensor]) -> "Embedding":
@@ -216,7 +216,6 @@ class LSTMCell(Layer):
     ) -> Tuple[Tuple[Tensor, Tensor], Tensor]:
 
         h_prev, c_prev = state
-        breakpoint()
         concat_vec = np.hstack((inputs, h_prev))
 
         f = nn.sigmoid(np.dot(self.Wf, concat_vec) + self.bf)
@@ -232,10 +231,14 @@ class LSTMCell(Layer):
 
     def tree_flatten(self) -> Tuple[Tuple[Tensor, ...], None]:
         return (
-            (self.Wf, self.bf, self.Wi, self.bi, self.Wc, self.bc, self.Wo, self.bo,),
+            (self.Wf, self.bf, self.Wi, self.bi, self.Wc, self.bc, self.Wo, self.bo),
             None,
         )
 
     @classmethod
     def tree_unflatten(cls, aux: None, params: Tuple[Tensor, ...]) -> "LSTMCell":
-        return cls.construct(**dict(zip(cls.__fields__.keys(), params)))
+
+        constuctor_dict = dict(
+            zip(("Wf", "bf", "Wi", "bi", "Wc", "bc", "Wo", "bo"), params)
+        )
+        return cls.construct(**constuctor_dict)

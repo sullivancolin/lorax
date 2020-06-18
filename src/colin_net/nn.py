@@ -144,12 +144,14 @@ class MLP(NeuralNet):
 
         return cls(layers=layers, input_dim=input_dim, output_dim=output_dim)
 
+    @jit
     def eval(self) -> None:
         for i, layer in enumerate(self.layers):
             if isinstance(layer, Dropout):
                 new_layer = layer.to_eval()
                 self.layers[i] = new_layer
 
+    @jit
     def train(self) -> None:
         for i, layer in enumerate(self.layers):
             if isinstance(layer, Dropout):
@@ -223,7 +225,7 @@ class LSTMClassifier(NeuralNet):
 
         sentence_embedding = self.embeddings(single_input)
         state_tuple, output_sequence = lax.scan(
-            self.cell, init=(h_prev, c_prev), xs=sentence_embedding
+            self.cell.__call__, init=(h_prev, c_prev), xs=sentence_embedding
         )
         # Semantics of lax.scan
         # outputs = []
@@ -248,23 +250,23 @@ class LSTMClassifier(NeuralNet):
 
     def tree_flatten(
         self,
-    ) -> Tuple[Tuple[Embedding, LSTMCell, Linear], Tuple[Tensor, Tensor, int]]:
+    ) -> Tuple[Tuple[Embedding, LSTMCell, Linear, Tensor, Tensor], int]:
         return (
-            (self.embeddings, self.cell, self.output_layer),
-            (self.h_prev, self.c_prev, self.output_dim),
+            (self.embeddings, self.cell, self.output_layer, self.h_prev, self.c_prev,),
+            self.output_dim,
         )
 
     @classmethod
     def tree_unflatten(
-        cls, aux: Tuple[Tensor, Tensor, int], params: Tuple[Embedding, LSTMCell, Linear]
+        cls, aux: int, params: Tuple[Embedding, LSTMCell, Linear, Tensor, Tensor],
     ) -> "LSTMClassifier":
         return cls.construct(
             embeddings=params[0],
             cell=params[1],
             output_layer=params[2],
-            h_prev=aux[0],
-            c_prev=aux[1],
-            output_dim=aux[2],
+            h_prev=params[3],
+            c_prev=params[4],
+            output_dim=aux,
         )
 
 

@@ -14,7 +14,7 @@ from jax import jit
 from colin_net.nn import NeuralNet
 from colin_net.tensor import Tensor
 
-Loss = Callable[[NeuralNet, Tensor, Tensor, Tensor], float]
+Loss = Callable[[NeuralNet, Tensor, Tensor], float]
 
 
 class LossEnum(str, Enum):

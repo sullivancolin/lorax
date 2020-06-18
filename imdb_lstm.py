@@ -33,7 +33,7 @@ class LabeledCorpus:
     def __iter__(self) -> Iterator[Tuple[Tensor, List[int]]]:
 
         with gzip.open(self.filename) as infile:
-            for line in tqdm(infile, total=self.len):
+            for line in tqdm(infile, total=self.len, desc=f"{self.filename} Corpus"):
                 label, doc = line.decode("utf-8").strip().split("\t")
                 if label == "1":
                     label_tensor = onp.array([1, 0])
@@ -99,68 +99,60 @@ def accuracy(actual: Tensor, predicted: Tensor) -> float:
     return np.mean(np.argmax(actual, axis=1) == np.argmax(predicted, axis=1))
 
 
-baches = []
-for i, batch in enumerate(train_iterator):
-    baches.append(batch.inputs)
-    if i > 10:
-        break
+num_epochs = 100
+progress = train(
+    lstm,
+    loss=mean_squared_error,
+    iterator=train_iterator,
+    num_epochs=num_epochs,
+    lr=0.001,
+)
 
-breakpoint()
-with disable_jit():
-    num_epochs = 100
-    progress = train(
-        lstm,
-        loss=mean_squared_error,
-        iterator=train_iterator,
-        num_epochs=num_epochs,
-        lr=0.001,
-    )
+for epoch, loss, lstm in tqdm(progress, total=num_epochs):
 
-    for epoch, loss, lstm in tqdm(progress, total=num_epochs):
+    # check loss and accuracy every 100 epochs
+    if epoch % 5 == 0:
 
-        # check loss and accuracy every 100 epochs
-        if epoch % 5 == 0:
-
-            print(epoch, loss)
-            eval_loss = 0.0
-            eval_probs = []
-            eval_labels = []
-            for batch in test_iterator:
-                test_loss = mean_squared_error(
-                    lstm, inputs=batch.inputs, targets=batch.targets
-                )
-                eval_loss += test_loss
-
-                test_probs = lstm.predict_proba(batch.inputs)
-                eval_probs.append(test_probs)
-
-                eval_labels.append(batch.targets)
-
-            eval_loss = eval_loss / len(test_iterator)
-            eval_labels = np.vstack(eval_labels)
-            eval_probs = np.vstack(eval_probs)
-
-            test_acc = accuracy(eval_labels, eval_probs)
-            print(f"Test Accuracy: {test_acc}")
-            print(f"Test Loss: {eval_loss}")
-            test_writer.add_scalar("accuracy", float(test_acc), epoch)
-            test_writer.add_scalar("loss", float(eval_loss), epoch)
-            train_writer.add_embedding(
-                onp.array(lstm.embeddings.embedding_matrix),
-                metadata=vocab,
-                global_step=epoch,
+        print(epoch, loss)
+        eval_loss = 0.0
+        eval_probs = []
+        eval_labels = []
+        for batch in test_iterator:
+            test_loss = mean_squared_error(
+                lstm, inputs=batch.inputs, targets=batch.targets
             )
+            eval_loss += test_loss
 
-            test_writer.flush()
-            lstm.save(f"lstm_runs/imdb_lstm_{epoch}.pkl", overwrite=True)
+            test_probs = lstm.predict_proba(batch.inputs)
+            eval_probs.append(test_probs)
 
-            if test_acc >= 0.99:
-                break
+            eval_labels.append(batch.targets)
 
-        train_writer.add_scalar("loss", float(loss), epoch)
-        train_writer.flush()
+        eval_loss = eval_loss / len(test_iterator)
+        eval_labels = np.vstack(eval_labels)
+        eval_probs = np.vstack(eval_probs)
 
-    test_writer.close()
-    train_writer.close()
+        test_acc = accuracy(eval_labels, eval_probs)
+        print(f"Test Accuracy: {test_acc}")
+        print(f"Test Loss: {eval_loss}")
+        test_writer.add_scalar("accuracy", float(test_acc), epoch)
+        test_writer.add_scalar("loss", float(eval_loss), epoch)
+        train_writer.add_embedding(
+            onp.array(lstm.embeddings.embedding_matrix),
+            metadata=vocab,
+            global_step=epoch,
+        )
 
-    lstm.save("lstm_runs/imdb_lstm_final.pkl", overwrite=True)
+        test_writer.flush()
+        lstm.save(f"lstm_runs/imdb_lstm_{epoch}.pkl", overwrite=True)
+
+        if test_acc >= 0.99:
+            break
+
+    train_writer.add_scalar("loss", float(loss), epoch)
+    train_writer.flush()
+
+test_writer.close()
+train_writer.close()
+
+lstm.save("lstm_runs/imdb_lstm_final.pkl", overwrite=True)
