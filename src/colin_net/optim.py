@@ -15,6 +15,8 @@ LossGrad = Callable[[NeuralNet, Tensor, Tensor], Tuple[float, NeuralNet]]
 
 
 class Optimizer(BaseModel):
+    loss: Loss
+
     def step(self, inputs: Tensor, targets: Tensor) -> Tuple[float, NeuralNet]:
         raise NotImplementedError
 
@@ -33,13 +35,13 @@ class SGD(Optimizer):
 
     net: NeuralNet
     value_grad_func: LossGrad
-    lr: float
+    lr: float = 0.01
 
     @classmethod
     def initialize(cls, net: NeuralNet, loss: Loss, lr: float = 0.01) -> "SGD":
         value_grad_func = value_and_grad(loss)
 
-        return cls(net=net, value_grad_func=value_grad_func, lr=lr)
+        return cls(net=net, value_grad_func=value_grad_func, lr=lr, loss=loss)
 
     def step(self, inputs: Tensor, targets: Tensor) -> Tuple[float, NeuralNet]:
 
@@ -58,6 +60,7 @@ class Adam(Optimizer):
     get_params: Callable
     opt_state: Any
     update_count: int
+    lr: float = 0.01
 
     @classmethod
     def initialize(cls, net: NeuralNet, loss: Loss, lr: float = 0.01) -> "Adam":
@@ -73,6 +76,8 @@ class Adam(Optimizer):
             get_params=get_params,
             opt_state=opt_state,
             update_count=update_count,
+            lr=lr,
+            loss=loss,
         )
 
     def step(self, inputs: Tensor, targets: Tensor) -> Tuple[float, NeuralNet]:

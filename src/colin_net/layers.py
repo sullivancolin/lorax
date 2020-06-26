@@ -11,7 +11,6 @@ from typing import Tuple
 
 import jax.numpy as np
 from jax import jit, nn, ops, random
-from jax.tree_util import register_pytree_node_class
 
 from colin_net.base import Module, RNGWrapper
 from colin_net.tensor import Tensor
@@ -38,8 +37,7 @@ class InitializerEnum(str, Enum):
 
 
 class Layer(Module, is_abstract=True):
-    """Abstract Class for Layers. Enforces subclasses to implement
-    __call__"""
+    """Abstract Class for Layers. Enforces subclasses to implement __call__"""
 
     @abstractmethod
     def __call__(self, inputs: Tensor) -> Tensor:
@@ -53,6 +51,7 @@ class ActivationEnum(str, Enum):
     selu = "selu"
     sigmoid = "sigmoid"
     softmax = "softmax"
+    mish = "mish"
     identity = "identity"
 
 
@@ -63,6 +62,7 @@ ACTIVATIONS = {
     "selu": nn.selu,
     "sigmoid": nn.sigmoid,
     "softmax": nn.softmax,
+    "mish": lambda x: x * np.tanh(nn.softplus(x)),
     "identity": lambda x: x,
 }
 
@@ -114,6 +114,26 @@ class Linear(Layer):
         cls, aux: Tuple[ActivationEnum], params: Tuple[Tensor, Tensor]
     ) -> "Linear":
         return cls.construct(w=params[0], b=params[1], activation=aux[0])
+
+
+class FrozenLinear(Linear):
+    """Unrainable Linear Layer"""
+
+    @classmethod
+    def initialize(
+        cls, *, w: Tensor, b: Tensor, activation: ActivationEnum
+    ) -> "FrozenLinear":
+        """Factory for new Linear from input and output dimentsions"""
+        return cls(w=w, b=b, activation=activation)
+
+    def tree_flatten(self) -> Tuple[Tuple[None], Tuple[Tensor, Tensor, ActivationEnum]]:
+        return (None,), (self.w, self.b, self.activation,)
+
+    @classmethod
+    def tree_unflatten(
+        cls, aux: Tuple[Tensor, Tensor, ActivationEnum], params: Tuple[None]
+    ) -> "FrozenLinear":
+        return cls.construct(w=aux[0], b=aux[1], activation=aux[2])
 
 
 class Dropout(Layer):
@@ -182,28 +202,31 @@ class Embedding(Layer):
         return cls.construct(embedding_matrix=params[0])
 
 
-@register_pytree_node_class
-class LSTMCell:
-    def __init__(
-        self,
-        Wf: Tensor,
-        bf: Tensor,
-        Wi: Tensor,
-        bi: Tensor,
-        Wc: Tensor,
-        bc: Tensor,
-        Wo: Tensor,
-        bo: Tensor,
-    ):
+class FrozenEmbedding(Embedding):
+    """Untrainable Embedding Layer for pretrained embedding"""
 
-        self.Wf = Wf
-        self.bf = bf
-        self.Wi = Wi
-        self.bi = bi
-        self.Wc = Wc
-        self.bc = bc
-        self.Wo = Wo
-        self.bo = bo
+    @classmethod
+    def initialize(cls, embedding_matrix: Tensor) -> "FrozenEmbedding":
+        return cls(embedding_matrix=embedding_matrix)
+
+    def tree_flatten(self) -> Tuple[Tuple[None], Tensor]:
+        return (None,), self.embedding_matrix
+
+    @classmethod
+    def tree_unflatten(cls, aux: Tensor, params: Tuple[None]) -> "FrozenEmbedding":
+        return cls.construct(embedding_matrix=aux)
+
+
+class LSTMCell(Layer):
+
+    Wf: Tensor
+    bf: Tensor
+    Wi: Tensor
+    bi: Tensor
+    Wc: Tensor
+    bc: Tensor
+    Wo: Tensor
+    bo: Tensor
 
     @classmethod
     def initialize(cls, input_dim: int, hidden_dim: int, key: Tensor) -> "LSTMCell":
@@ -254,7 +277,7 @@ class LSTMCell:
     @classmethod
     def tree_unflatten(cls, aux: None, params: Tuple[Tensor, ...]) -> "LSTMCell":
 
-        return cls(
+        return cls.construct(
             Wf=params[0],
             bf=params[1],
             Wi=params[2],

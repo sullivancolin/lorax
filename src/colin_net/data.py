@@ -3,6 +3,7 @@ We'll feed inputs into our network in batches.
 So here are some tools for iterating over data in batches.
 """
 from dataclasses import dataclass
+from enum import Enum
 from typing import Iterator, List
 
 import jax.numpy as np
@@ -64,7 +65,7 @@ class PaddedIterator(DataIterator):
         self.targets = np.array(onp.array(targets))
         self.batch_size = batch_size
         self.key = key
-        self.len = len(self.inputs)
+        self.len = len(np.arange(0, len(self.inputs), self.batch_size))
 
     def __len__(self) -> int:
         return self.len
@@ -89,3 +90,11 @@ class PaddedIterator(DataIterator):
 
             padded_inputs = self.left_pad_batch(batch_inputs)
             yield Batch(padded_inputs, batch_targets)
+
+
+class IteratorEnum(str, Enum):
+    batch_iterator = "batch_iterator"
+    padded_iterator = "padded_iterator"
+
+
+ITERATORS = {"batch_iterator": BatchIterator, "padded_iterator": PaddedIterator}

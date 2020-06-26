@@ -7,6 +7,7 @@ from typing import Any, Dict, Tuple, Union
 
 import jax.numpy as np
 from jax import jit, random
+from jax.interpreters.xla import DeviceArray
 from jax.tree_util import register_pytree_node
 from numpy import ndarray
 from pydantic import BaseModel
@@ -24,9 +25,8 @@ class Module(BaseModel):
 
     class Config:
         allow_mutation = False
-        arbitrary_types_allowed = True
         json_encoders = {
-            Tensor: lambda t: f"shape={t.shape}",
+            DeviceArray: lambda t: f"shape={t.shape}",
             ndarray: lambda a: f"shape={a.shape}",
         }
 
@@ -37,7 +37,7 @@ class Module(BaseModel):
         return {self.__class__.__name__: super().dict()}
 
     def __repr__(self) -> str:
-        return f"<{self.__class__.__name__}>"
+        return self.json()
 
     def __str__(self) -> str:
         return self.json()

@@ -5,6 +5,7 @@ learned with a simple linear model is XOR
 import datetime
 
 import jax.numpy as np
+import numpy as onp
 from jax import random
 from tensorboardX import SummaryWriter
 from tqdm.autonotebook import tqdm
@@ -16,7 +17,7 @@ from colin_net.tensor import Tensor
 from colin_net.train import train
 
 now = datetime.datetime.now().isoformat()
-writer = SummaryWriter(f"xor_runs/train-{now}")
+writer = SummaryWriter(f"xor_runs/{now}")
 
 # Create Input Data and True Labels
 inputs = np.array([[0, 0], [1, 0], [0, 1], [1, 1]])
@@ -31,8 +32,15 @@ key, subkey = random.split(key)
 
 # Create NeuralNet Instance
 net = MLP.create_mlp(
-    input_dim=2, output_dim=2, hidden_dim=2, key=subkey, dropout_keep=0.8, num_hidden=2,
+    input_dim=2,
+    output_dim=2,
+    hidden_dim=2,
+    key=subkey,
+    dropout_keep=None,
+    num_hidden=2,
 )
+
+writer.add_text("Net", f"# Net\n\n```{net.json()}```")
 
 key, subkey = random.split(key)
 # Create an iterator over the input data
@@ -55,24 +63,39 @@ for i, (epoch, loss, net) in enumerate(tqdm(progress, total=num_epochs)):
     # checks accuracy every 50 epochs
     if i % 5 == 0:
         print(epoch, loss)
-        net.eval()
+
+        train_predicted = net.predict_proba(inputs)
+        train_accuracy = float(accuracy(targets, train_predicted))
+        net = net.to_eval()
         predicted = net.predict_proba(inputs)
         acc_metric = float(accuracy(targets, predicted))
-        writer.add_scalar("train_accuracy", acc_metric, i)
+        writer.add_scalar("test_acc", acc_metric, i)
+        writer.add_scalar("train_acc", train_accuracy, i)
         print(f"Accuracy: {acc_metric}")
         if acc_metric >= 0.99:
             print("Achieved Perfect Prediction!")
             break
-        net.train()
+        net = net.to_train()
+        writer.flush()
+    net = net.to_eval()
+    test_loss = float(mean_squared_error(net, inputs, targets))
+    net = net.to_train()
     writer.add_scalar("train_loss", float(loss), i)
+    writer.add_scalar("test_loss", float(test_loss), i)
+
 
 net.save("xor_model.pkl", overwrite=True)
-writer.close()
 
 # Display Predictions
+net = net.to_eval()
 probabilties = net.predict_proba(inputs)
 for gold, prob, pred in zip(targets, probabilties, np.argmax(probabilties, axis=1)):
 
     print(gold, prob, pred)
 
-print("Accuracy: ", accuracy(targets, probabilties))
+accuracy = float(accuracy(targets, probabilties))
+print("Accuracy: ", accuracy)
+
+writer.add_pr_curve("PR", onp.array(targets), onp.array(probabilties))
+
+writer.close()

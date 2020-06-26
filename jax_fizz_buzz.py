@@ -59,6 +59,8 @@ net = MLP.create_mlp(
     input_dim=10, output_dim=4, hidden_dim=50, key=key, num_hidden=2, dropout_keep=None,
 )
 
+train_writer.add_text("Net", f"```{net.json()}```")
+
 iterator = BatchIterator(inputs=inputs, targets=targets, key=key)
 
 
@@ -73,13 +75,11 @@ progress = train(
     net, loss=mean_squared_error, iterator=iterator, num_epochs=num_epochs, lr=0.1,
 )
 
-points = []
-eval_points = []
 for i, (epoch, loss, net) in enumerate(tqdm(progress, total=num_epochs)):
 
     # check loss and accuracy every 100 epochs
     if i % 100 == 0:
-        net.eval()
+        net = net.to_eval()
         print(epoch, loss)
         predicted = net.predict_proba(inputs)
         acc_metric = accuracy(targets, predicted)
@@ -95,25 +95,24 @@ for i, (epoch, loss, net) in enumerate(tqdm(progress, total=num_epochs)):
         train_writer.add_histogram("Layer2-b", onp.array(net.layers[1].b), i)
         if test_acc >= 0.99:
             break
-        net.train()
+        net = net.to_train()
 
-    points.append([epoch, loss])
-    net.eval()
+    net = net.to_eval()
     eval_loss = mean_squared_error(net, test_X, test_y)
-    net.train()
-    eval_points.append(eval_loss)
+    net = net.to_train()
+
     test_writer.add_scalar("loss", float(eval_loss), i)
     train_writer.add_scalar("loss", float(loss), i)
 
-net.eval()
-
-test_writer.close()
-train_writer.close()
 
 net.save("jax_fizz_buzz.pkl", overwrite=True)
-
+net = net.to_eval()
 test_predictions = net.predict_proba(test_X)
 
 test_accuracy = accuracy(test_y, test_predictions)
+test_writer.add_pr_curve("PR", onp.array(test_y), onp.array(test_predictions))
+
 
 print(f"Test Accuracy: {test_accuracy}")
+test_writer.close()
+train_writer.close()

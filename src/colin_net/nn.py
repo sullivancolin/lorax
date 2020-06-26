@@ -33,6 +33,15 @@ class NeuralNet(Layer, is_abstract=True):
     def __call__(self, inputs: Tensor) -> Tensor:
         raise NotImplementedError
 
+    def to_eval(self) -> "NeuralNet":
+        return self
+
+    def to_train(self) -> "NeuralNet":
+        return self
+
+    def randomize(self) -> "NeuralNet":
+        return self
+
     def save(self, path: Union[str, Path], overwrite: bool = False) -> None:
         path = Path(path)
         if path.suffix != suffix:
@@ -145,25 +154,32 @@ class MLP(NeuralNet):
         return cls(layers=layers, input_dim=input_dim, output_dim=output_dim)
 
     @jit
-    def eval(self) -> None:
+    def to_eval(self) -> "MLP":
         for i, layer in enumerate(self.layers):
             if isinstance(layer, Dropout):
                 new_layer = layer.to_eval()
                 self.layers[i] = new_layer
+        return MLP(
+            layers=self.layers, input_dim=self.input_dim, output_dim=self.output_dim
+        )
 
     @jit
-    def train(self) -> None:
+    def to_train(self) -> "MLP":
         for i, layer in enumerate(self.layers):
             if isinstance(layer, Dropout):
                 new_layer = layer.to_train().randomize()
                 self.layers[i] = new_layer
+        return MLP(
+            layers=self.layers, input_dim=self.input_dim, output_dim=self.output_dim
+        )
 
     @jit
-    def randomize(self) -> None:
-        for i, layer in enumerate(self.layers):
-            if isinstance(layer, Dropout):
-                new_layer = layer.randomize()
-                self.layers[i] = new_layer
+    def randomize(self) -> "MLP":
+        layers = [
+            layer.randomize() if isinstance(layer, Dropout) else layer
+            for layer in self.layers
+        ]
+        return MLP(layers=layers, input_dim=self.input_dim, output_dim=self.output_dim)
 
     def tree_flatten(self) -> Tuple[List[Layer], Tuple[int, int]]:
         return self.layers, (self.input_dim, self.output_dim)
@@ -171,6 +187,23 @@ class MLP(NeuralNet):
     @classmethod
     def tree_unflatten(cls, aux: Tuple[int, int], params: List[Layer]) -> "MLP":
         return cls(layers=params, input_dim=aux[0], output_dim=aux[1])
+
+
+class FrozenMLP(MLP):
+    @classmethod
+    def initialize(
+        cls, layers: List[Layer], input_dim: int, output_dim: int
+    ) -> "FrozenMLP":
+        return cls(layers=layers, input_dim=input_dim, output_dim=output_dim)
+
+    def tree_flatten(self) -> Tuple[Tuple[None], Tuple[List[Layer], int, int]]:
+        return (None,), (self.layers, self.input_dim, self.output_dim)
+
+    @classmethod
+    def tree_unflatten(
+        cls, aux: Tuple[List[Layer], int, int], params: Tuple[None]
+    ) -> "MLP":
+        return cls(layers=aux[0], input_dim=aux[1], output_dim=aux[2])
 
 
 class LSTMClassifier(NeuralNet):
@@ -223,9 +256,15 @@ class LSTMClassifier(NeuralNet):
         if c_prev is None:
             c_prev = self.c_prev
 
+        @jit
+        def wrapped_cell(
+            state: Tuple[Tensor, Tensor], inputs: Tensor
+        ) -> Tuple[Tuple[Tensor, Tensor], Tensor]:
+            return self.cell(state, inputs)
+
         sentence_embedding = self.embeddings(single_input)
         state_tuple, output_sequence = lax.scan(
-            self.cell.__call__, init=(h_prev, c_prev), xs=sentence_embedding
+            wrapped_cell, init=(h_prev, c_prev), xs=sentence_embedding
         )
         # Semantics of lax.scan
         # outputs = []
@@ -267,6 +306,57 @@ class LSTMClassifier(NeuralNet):
             h_prev=params[3],
             c_prev=params[4],
             output_dim=aux,
+        )
+
+
+class FrozenLSTMClassifier(LSTMClassifier):
+    @classmethod
+    def initialize(
+        cls,
+        embeddings: Embedding,
+        cell: LSTMCell,
+        output_layer: Linear,
+        h_prev: Tensor,
+        c_prev: Tensor,
+        output_dim: int,
+    ) -> "FrozenLSTMClassifier":
+        return cls(
+            embeddings=embeddings,
+            cell=cell,
+            output_layer=output_layer,
+            h_prev=h_prev,
+            c_prev=c_prev,
+            output_dim=output_dim,
+        )
+
+    def tree_flatten(
+        self,
+    ) -> Tuple[Tuple[None], Tuple[Embedding, LSTMCell, Linear, Tensor, Tensor, int]]:
+        return (
+            (None,),
+            (
+                self.embeddings,
+                self.cell,
+                self.output_layer,
+                self.h_prev,
+                self.c_prev,
+                self.output_dim,
+            ),
+        )
+
+    @classmethod
+    def tree_unflatten(
+        cls,
+        aux: Tuple[Embedding, LSTMCell, Linear, Tensor, Tensor, int],
+        params: Tuple[None],
+    ) -> "LSTMClassifier":
+        return cls.construct(
+            embeddings=aux[0],
+            cell=aux[1],
+            output_layer=aux[2],
+            h_prev=aux[3],
+            c_prev=aux[4],
+            output_dim=aux[5],
         )
 
 

@@ -11,6 +11,7 @@ from tqdm.autonotebook import tqdm
 
 from colin_net.data import PaddedIterator
 from colin_net.loss import mean_squared_error
+from colin_net.metrics import accuracy
 from colin_net.nn import LSTMClassifier
 from colin_net.tensor import Tensor
 from colin_net.train import train
@@ -88,16 +89,11 @@ lstm = LSTMClassifier.initialize(
     vocab_size=VOCAB_SIZE, hidden_dim=200, output_dim=2, key=key
 )
 
+breakpoint()
 now = datetime.now().isoformat()
 
 train_writer = SummaryWriter(f"lstm_runs/train-{now}")
 test_writer = SummaryWriter(f"lstm_runs/test-{now}")
-
-
-# define accuracy calculation
-def accuracy(actual: Tensor, predicted: Tensor) -> float:
-    return np.mean(np.argmax(actual, axis=1) == np.argmax(predicted, axis=1))
-
 
 num_epochs = 100
 progress = train(
