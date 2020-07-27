@@ -2,76 +2,56 @@
 The canonical example of a function that can't be
 learned with a simple linear model is XOR
 """
-import jax.numpy as np
+import json
 
-from colin_net.config import Experiment
-from colin_net.tensor import Tensor
+import jax.numpy as np
+from tqdm import tqdm
+
+import wandb
+from colin_net.config import Experiment, log_wandb
+from colin_net.metrics import accuracy
 
 # Create Input Data and True Labels
 inputs = np.array([[0, 0], [1, 0], [0, 1], [1, 1]])
 
 targets = np.array([[1, 0], [0, 1], [0, 1], [1, 0]])
 
+with open("mlp_experiment_defaults.json") as infile:
+    config = json.load(infile)
 
-config = {
-    "experiment_name": "xor_runs",
-    "net_config": {
-        "output_dim": 2,
-        "input_dim": 2,
-        "hidden_dim": 5,
-        "num_hidden": 5,
-        "activation": "tanh",
-        "dropout_keep": None,
-    },
-    "random_seed": 42,
-    "loss": "mean_squared_error",
-    "regularization": None,
-    "optimizer": "adam",
-    "iterator_type": "batch_iterator",
-    "learning_rate": 0.001,
-    "batch_size": 4,
-    "global_step": 5000,
-    "log_every": 10,
-}
+
+wandb.init(project="colin_net_xor", config=config)
+config = wandb.config
 
 
 experiment = Experiment(**config)
 
+print(json.dumps(experiment.dict(), indent=4))
 
-# define accuracy calculation
-def accuracy(actual: Tensor, predicted: Tensor) -> float:
-    return np.mean(np.argmax(actual, axis=1) == np.argmax(predicted, axis=1))
+update_generator = experiment.train(
+    inputs, targets, inputs, targets, iterator_type="batch_iterator"
+)
 
-
-for update_state in experiment.train(inputs, targets, inputs, targets):
-    if update_state.iteration % experiment.log_every == 0:
-        net = update_state.net
-        train_predicted = net.predict_proba(inputs)
-        train_accuracy = float(accuracy(targets, train_predicted))
-        net = net.to_eval()
-        predicted = net.predict_proba(inputs)
+bar = tqdm(total=experiment.global_step)
+for update_state in update_generator:
+    if update_state.step % experiment.log_every == 0:
+        model = update_state.model.to_eval()
+        predicted = model.predict_proba(inputs)
         acc_metric = float(accuracy(targets, predicted))
-        update_state.test_writer.add_scalar(
-            "accuracy", acc_metric, update_state.iteration
-        )
-        update_state.train_writer.add_scalar(
-            "accuracy", train_accuracy, update_state.iteration
-        )
-        print(f"Accuracy: {acc_metric}")
-        update_state.train_writer.flush()
-        update_state.test_writer.flush()
+        log_wandb({"train_accuracy": acc_metric}, step=update_state.step)
+        bar.set_description(f"acc:{acc_metric}, loss:{update_state.loss}")
         if acc_metric >= 0.99:
             print("Achieved Perfect Prediction!")
-            break
-        net = net.to_train()
+            # break
+        model = model.to_train()
+    bar.update()
 
 
-final_net = update_state.net
-final_net.save(f"{experiment.experiment_name}/final_model.pkl", overwrite=True)
+final_model = update_state.model
 
 # Display Predictions
-final_net = final_net.to_eval()
-probabilties = final_net.predict_proba(inputs)
+final_model = final_model.to_eval()
+probabilties = final_model.predict_proba(inputs)
 for gold, prob, pred in zip(targets, probabilties, np.argmax(probabilties, axis=1)):
 
     print(gold, prob, pred)

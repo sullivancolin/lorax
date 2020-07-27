@@ -1,16 +1,14 @@
-#!/usr/bin/env python
 """The setup script."""
 
 from setuptools import find_packages, setup
 
 requirements = [
-    "tensorboardX>=2.0",
     "numpy>=1.18.3",
     "jax>=0.1.65",
     "jaxlib>=0.1.45",
     "tqdm>=4.45.0",
-    "tensorboard>=2.2.1",
     "pydantic>=1.5.1",
+    "wandb>=0.9.4",
 ]
 
 setup_requirements = ["pytest-runner", "setuptools>=38.6.0", "wheel>=0.31.0"]
