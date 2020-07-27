@@ -3,12 +3,12 @@ from abc import abstractmethod
 from typing import Any, Dict, Iterator, List, Optional, Sequence, Type, Union
 
 import jax.numpy as np
+import wandb
 from jax import random
 from jax.interpreters.xla import DeviceArray
 from jax.tree_util import tree_flatten
 from pydantic import BaseModel
 
-import wandb
 from colin_net.data import ITERATORS, DataIterator, IteratorEnum
 from colin_net.layers import ActivationEnum, InitializerEnum
 from colin_net.loss import (

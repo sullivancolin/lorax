@@ -15,4 +15,5 @@ Live Coding Video [Here](https://www.youtube.com/watch?v=o64FV-ez6Gw)
 * Jupyter Notebook and standalone scripts for both xor and fizzbuzz
 * Implemented Dropout Layer
 * Automatic Pytree class registration via inheritance
-*
+
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/niloch/colin_net/master)
