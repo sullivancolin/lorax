@@ -7,7 +7,7 @@ inputs -> Linear -> Tanh -> Linear -> output
 """
 from abc import abstractmethod
 from enum import Enum
-from typing import Tuple
+from typing import Any, Tuple
 
 import jax.numpy as np
 from jax import jit, nn, ops, random
@@ -117,7 +117,10 @@ class Linear(Layer):
 
 
 class FrozenLinear(Linear):
-    """Unrainable Linear Layer"""
+    """Untrainable Linear Layer"""
+
+    def initialize(self, *args: Any, **kwargs: Any) -> None:
+        raise NotImplementedError
 
     def tree_flatten(self) -> Tuple[Tuple[None], Tuple[Tensor, Tensor, ActivationEnum]]:
         return (None,), (self.w, self.b, self.activation,)
@@ -194,6 +197,9 @@ class Embedding(Layer):
 
 class FrozenEmbedding(Embedding):
     """Untrainable Embedding Layer for pretrained embedding"""
+
+    def initialize(self, *args: Any, **kwargs: Any) -> None:
+        raise NotImplementedError
 
     def tree_flatten(self) -> Tuple[Tuple[None], Tensor]:
         return (None,), self.embedding_matrix

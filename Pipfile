@@ -6,7 +6,6 @@ verify_ssl = true
 [dev-packages]
 flake8 = "*"
 mypy = "*"
-black = "*"
 isort = "*"
 ipdb = "*"
 bumpversion = "*"
@@ -16,6 +15,7 @@ pytest-cov = "*"
 pytest-sugar = "*"
 flake8-bugbear = "*"
 pytest-html = "*"
+black = "==19.10b0"
 
 [packages]
 colin_net = {editable = true,path = "."}
@@ -28,6 +28,3 @@ scikit-learn = "*"
 
 [requires]
 python_version = "3.7"
-
-[pipenv]
-allow_prereleases = true

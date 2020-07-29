@@ -6,10 +6,10 @@ import json
 
 import jax.numpy as np
 import wandb
-from tqdm import tqdm
+from tqdm.autonotebook import tqdm
 
-from colin_net.config import Experiment, log_wandb
 from colin_net.metrics import accuracy
+from colin_net.train import Experiment, wandb_log, wandb_notes
 
 # Create Input Data and True Labels
 inputs = np.array([[0, 0], [1, 0], [0, 1], [1, 1]])
@@ -34,15 +34,16 @@ update_generator = experiment.train(
 
 bar = tqdm(total=experiment.global_step)
 for update_state in update_generator:
+    if update_state.step == 1:
+        markdown = f"```json\n{update_state.model.json()}\n```"
+        wandb_notes(markdown)
     if update_state.step % experiment.log_every == 0:
         model = update_state.model.to_eval()
         predicted = model.predict_proba(inputs)
-        acc_metric = float(accuracy(targets, predicted))
-        log_wandb({"train_accuracy": acc_metric}, step=update_state.step)
-        bar.set_description(f"acc:{acc_metric}, loss:{update_state.loss}")
-        if acc_metric >= 0.99:
-            print("Achieved Perfect Prediction!")
-            # break
+        acc_metric = float(accuracy(targets, predicted)) * 100
+        wandb_log({"train_accuracy": acc_metric}, step=update_state.step)
+        bar.set_description(f"acc:{acc_metric:.1f}%, loss:{update_state.loss:.5f}")
+
         model = model.to_train()
     bar.update()
 

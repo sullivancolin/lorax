@@ -26,32 +26,53 @@ class LossEnum(str, Enum):
 class RegularizationEnum(str, Enum):
     l2 = "l2"
     l1 = "l1"
+    l1_l1 = "l1_l2"
 
 
 @jit
-def l2(net: Model) -> float:
-    params, _ = tree_flatten(net)
-    return np.sum([np.sum(layer ** 2) for layer in params])
+def l2(model: Model) -> float:
+    params, _ = tree_flatten(model)
+    return np.sum([np.sum(layer ** 2) for layer in params]) / 2
 
 
 def l2_reguluarized(loss: Loss) -> Callable[[Model, Tensor, Tensor], float]:
     @jit
-    def wrapped(net: Model, inputs: Tensor, targets: Tensor) -> float:
-        return loss(net, inputs, targets) + l2(net)
+    def wrapped(
+        model: Model, inputs: Tensor, targets: Tensor, gamma: float = 0.01
+    ) -> float:
+        return loss(model, inputs, targets) + l2(model) * gamma
 
     return wrapped
 
 
 @jit
-def l1(net: Model) -> float:
-    params, _ = tree_flatten(net)
+def l1(model: Model) -> float:
+    params, _ = tree_flatten(model)
     return np.sum([np.sum(np.abs(layer)) for layer in params])
 
 
 def l1_regularized(loss: Loss) -> Callable[[Model, Tensor, Tensor], float]:
     @jit
-    def wrapped(net: Model, inputs: Tensor, targets: Tensor) -> float:
-        return loss(net, inputs, targets) + l1(net)
+    def wrapped(
+        model: Model, inputs: Tensor, targets: Tensor, gamma: float = 0.01
+    ) -> float:
+        return loss(model, inputs, targets) + l1(model) * gamma
+
+    return wrapped
+
+
+def l1_l2_regularized(loss: Loss) -> Callable[[Model, Tensor, Tensor], float]:
+    @jit
+    def wrapped(
+        model: Model,
+        inputs: Tensor,
+        targets: Tensor,
+        l1_gamma: float = 0.01,
+        l2_gamma: float = 0.01,
+    ) -> float:
+        return (
+            loss(model, inputs, targets) + l1(model) * l1_gamma + l2(model) * l2_gamma
+        )
 
     return wrapped
 
@@ -80,4 +101,5 @@ LOSS_FUNCTIONS = {
 REGULARIZATIONS = {
     "l2": l2_reguluarized,
     "l1": l1_regularized,
+    "l1_l2": l1_l2_regularized,
 }
