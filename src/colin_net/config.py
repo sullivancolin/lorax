@@ -34,10 +34,3 @@ class LSTMConfig(ModelConfig):
 
     def initialize(self, key: Tensor) -> LSTMClassifier:
         return LSTMClassifier.initialize(key=key, **self.dict())
-
-
-class BiLSTMConfig(LSTMConfig):
-    bidirectional: bool = True
-
-    def initialize(self, key: Tensor) -> BiLSTMClassifier:
-        return BiLSTMClassifier.initialize(key=key, **self.dict())

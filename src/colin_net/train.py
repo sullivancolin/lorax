@@ -8,7 +8,7 @@ from jax import random
 from jax.tree_util import tree_flatten
 from pydantic import BaseModel
 
-from colin_net.config import BiLSTMConfig, LSTMConfig, MLPConfig
+from colin_net.config import LSTMConfig, MLPConfig
 from colin_net.data import ITERATORS, DataIterator, IteratorEnum
 from colin_net.loss import (
     LOSS_FUNCTIONS,
@@ -60,7 +60,7 @@ class Experiment(BaseModel):
         extra = "allow"
 
     experiment_name: str
-    model_config: Union[MLPConfig, BiLSTMConfig, LSTMConfig]
+    model_config: Union[MLPConfig, LSTMConfig]
     random_seed: int = 42
     loss: LossEnum = LossEnum.mean_squared_error
     regularization: Optional[RegularizationEnum] = None

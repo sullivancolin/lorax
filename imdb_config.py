@@ -1,12 +1,14 @@
 import gzip
+import json
 from typing import Iterator, List, Tuple
 
-import jax.numpy as np
 import numpy as onp
+import wandb
 from tqdm.autonotebook import tqdm
 
-from colin_net.config import Experiment
+from colin_net.metrics import accuracy
 from colin_net.tensor import Tensor
+from colin_net.train import Experiment, wandb_log, wandb_save
 
 
 class LabeledCorpus:
@@ -63,54 +65,41 @@ assert len(vocab) == VOCAB_SIZE
 
 config = {
     "experiment_name": "imdb_lstm",
-    "net_config": {"output_dim": 2, "vocab_size": VOCAB_SIZE, "hidden_dim": 200},
+    "model_config": {"output_dim": 2, "vocab_size": VOCAB_SIZE, "hidden_dim": 200},
     "random_seed": 42,
     "iterator_type": "padded_iterator",
-    "loss": "mean_squared_error",
+    "loss": "cross_entropy",
     "optimizer": "adam",
-    "learning_rate": 0.01,
-    "batch_size": 64,
-    "global_stel": 5000,
+    "learning_rate": 0.0001,
+    "regularization": "l2",
+    "batch_size": 32,
+    "global_step": 50000,
     "log_every": 100,
 }
 
+wandb.init(project="colin_net_lstm", config=config, save_code=True)
+config = wandb.config
+
 experiment = Experiment(**config)
 
+print(json.dumps(experiment.dict(), indent=4))
 
-# define accuracy calculation
-def accuracy(actual: Tensor, predicted: Tensor) -> float:
-    return np.mean(np.argmax(actual, axis=1) == np.argmax(predicted, axis=1))
+update_generator = experiment.train(
+    train_X=train_inputs,
+    train_Y=train_targets,
+    test_X=test_inputs,
+    test_Y=test_targets,
+    iterator_type="padded_iterator",
+)
 
-
-for update_state in experiment.train(
-    train_inputs, train_targets, test_inputs, test_targets
-):
-    if update_state.iteration % experiment.log_every == 0:
-        net = update_state.net
-        net = net.to_eval()
-        # predicted = net.predict_proba(test_inputs)
-        # acc_metric = float(accuracy(test_targets, predicted))
-        # update_state.test_writer.add_scalar(
-        #     "accuracy", acc_metric, update_state.iteration
-        # )
-        # print(f"Accuracy: {acc_metric}")
-        update_state.train_writer.flush()
-        update_state.test_writer.flush()
-        # if acc_metric >= 0.99:
-        #     print("Achieved Perfect Prediction!")
-        #     break
-        net = net.to_train()
+bar = tqdm(total=experiment.global_step)
+for update_state in update_generator:
+    # if update_state.step == 1:
+    #     markdown = f"# Model Definition\n```json\n{update_state.model.json()}\n```"
+    #     wandb_notes(markdown)
+    if update_state.step % experiment.log_every == 0:
+        bar.set_description(f"loss:{update_state.loss:.5f}")
+    bar.update()
 
 
-final_net = update_state.net
-final_net.save(f"{experiment.experiment_name}/final_model.pkl", overwrite=True)
-
-# # Display Predictions
-# final_net = final_net.to_eval()
-# probabilties = final_net.predict_proba(inputs)
-# for gold, prob, pred in zip(targets, probabilties, np.argmax(probabilties, axis=1)):
-
-#     print(gold, prob, pred)
-
-# accuracy_score = float(accuracy(targets, probabilties))
-# print("Accuracy: ", accuracy_score)
+final_model = update_state.model
