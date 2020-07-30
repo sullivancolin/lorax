@@ -282,6 +282,11 @@ class LSTMCell(Layer):
 
 
 class FrozenLSTMCell(LSTMCell):
+    """Untrainable LSTM Cell for pretrained layer"""
+
+    def initialize(self, *args: Any, **kwargs: Any) -> None:
+        raise NotImplementedError
+
     def tree_flatten(self) -> Tuple[Tuple[Tensor, ...], None]:
         return (
             (self.Wf, self.bf, self.Wi, self.bi, self.Wc, self.bc, self.Wo, self.bo),
