@@ -7,6 +7,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any, Dict, List, Union
 
+import numpy as onp
 from jax import jit, nn
 from jax.interpreters.xla import DeviceArray
 from jax.tree_util import tree_flatten
@@ -20,7 +21,7 @@ suffix = ".pkl"
 def get_keys(d: Dict[str, Any]) -> List[str]:
     keys = []
     for k, v in d.items():
-        if isinstance(v, DeviceArray):
+        if isinstance(v, DeviceArray) or isinstance(v, onp.ndarray):
             keys.append(k)
         elif isinstance(v, dict) and "Frozen" not in k:
             keys.extend(get_keys(v))

@@ -36,16 +36,31 @@ def binary_encode(x: int) -> List[int]:
     return [x >> i & 1 for i in range(10)]
 
 
-inputs = np.array([binary_encode(x) for x in range(101, 1024)])
-targets = np.array([fizz_buzz_encode(x) for x in range(101, 1024)])
+train_X = np.array([binary_encode(x) for x in range(101, 1024)])
+train_Y = np.array([fizz_buzz_encode(x) for x in range(101, 1024)])
 
 test_X = np.array([binary_encode(x) for x in range(1, 101)])
 test_y = np.array([fizz_buzz_encode(x) for x in range(1, 101)])
 
-
-with open("fizzbuzz_config.json") as infile:
-    config = json.load(infile)
-
+config = {
+    "experiment_name": "fizzbuzz",
+    "random_seed": 42,
+    "loss": "mean_squared_error",
+    "regularization": None,
+    "optimizer": "sgd",
+    "model_config": {
+        "input_dim": 10,
+        "output_dim": 4,
+        "hidden_dim": 50,
+        "num_hidden": 2,
+        "activation": "tanh",
+        "dropout_keep": None,
+    },
+    "learing_rate": 0.01,
+    "batch_size": 32,
+    "global_step": 50000,
+    "log_every": 100,
+}
 
 wandb.init(project="colin_net_fizzbuzz", config=config, save_code=True)
 config = wandb.config
@@ -56,8 +71,8 @@ experiment = Experiment(**config)
 print(json.dumps(experiment.dict(), indent=4))
 
 update_generator = experiment.train(
-    train_X=inputs,
-    train_Y=targets,
+    train_X=train_X,
+    train_Y=train_Y,
     test_X=test_X,
     test_Y=test_y,
     iterator_type="batch_iterator",
@@ -65,13 +80,13 @@ update_generator = experiment.train(
 
 bar = tqdm(total=experiment.global_step)
 for update_state in update_generator:
-    # if update_state.step == 1:
-    #     markdown = f"# Model Definition\n```json\n{update_state.model.json()}\n```"
-    #     wandb_notes(markdown)
+    if update_state.step == 1:
+        markdown = f"{update_state.model.json()}"
+        wandb_notes(markdown)
     if update_state.step % experiment.log_every == 0:
         model = update_state.model.to_eval()
-        predicted = model.predict_proba(inputs)
-        acc_metric = float(accuracy(targets, predicted)) * 100
+        predicted = model.predict_proba(train_X)
+        acc_metric = float(accuracy(train_Y, predicted)) * 100
         wandb_log({"train_accuracy": acc_metric}, step=update_state.step)
         bar.set_description(f"acc:{acc_metric:.1f}%, loss:{update_state.loss:.5f}")
 

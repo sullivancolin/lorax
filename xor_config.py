@@ -16,13 +16,31 @@ inputs = np.array([[0, 0], [1, 0], [0, 1], [1, 1]])
 
 targets = np.array([[1, 0], [0, 1], [0, 1], [1, 0]])
 
-with open("mlp_experiment_defaults.json") as infile:
-    config = json.load(infile)
+config = {
+    "experiment_name": "xor_runs",
+    "model_config": {
+        "output_dim": 2,
+        "input_dim": 2,
+        "hidden_dim": 2,
+        "num_hidden": 2,
+        "activation": "tanh",
+        "dropout_keep": None,
+    },
+    "random_seed": 42,
+    "loss": "mean_squared_error",
+    "regularization": None,
+    "optimizer": "sgd",
+    "learning_rate": 0.001,
+    "batch_size": 4,
+    "global_step": 5000,
+    "log_every": 50,
+}
 
 
-wandb.init(project="colin_net_xor", config=config)
+wandb.init(project="colin_net_xor", config=config, save_code=True)
 config = wandb.config
 
+breakpoint()
 
 experiment = Experiment(**config)
 
@@ -35,7 +53,7 @@ update_generator = experiment.train(
 bar = tqdm(total=experiment.global_step)
 for update_state in update_generator:
     if update_state.step == 1:
-        markdown = f"```json\n{update_state.model.json()}\n```"
+        markdown = f"{update_state.model.json()}"
         wandb_notes(markdown)
     if update_state.step % experiment.log_every == 0:
         model = update_state.model.to_eval()

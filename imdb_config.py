@@ -6,9 +6,8 @@ import numpy as onp
 import wandb
 from tqdm.autonotebook import tqdm
 
-from colin_net.metrics import accuracy
 from colin_net.tensor import Tensor
-from colin_net.train import Experiment, wandb_log, wandb_save
+from colin_net.train import Experiment, wandb_notes
 
 
 class LabeledCorpus:
@@ -74,7 +73,7 @@ config = {
     "regularization": "l2",
     "batch_size": 32,
     "global_step": 50000,
-    "log_every": 100,
+    "log_every": 500,
 }
 
 wandb.init(project="colin_net_lstm", config=config, save_code=True)
@@ -94,12 +93,13 @@ update_generator = experiment.train(
 
 bar = tqdm(total=experiment.global_step)
 for update_state in update_generator:
-    # if update_state.step == 1:
-    #     markdown = f"# Model Definition\n```json\n{update_state.model.json()}\n```"
-    #     wandb_notes(markdown)
+    if update_state.step == 1:
+        markdown = f"{update_state.model.json()}"
+        wandb_notes(markdown)
     if update_state.step % experiment.log_every == 0:
         bar.set_description(f"loss:{update_state.loss:.5f}")
     bar.update()
 
 
 final_model = update_state.model
+final_model.save("final_lstm.pkl")

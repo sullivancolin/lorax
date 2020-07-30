@@ -68,7 +68,7 @@ class Experiment(BaseModel):
     learning_rate: float = 0.01
     batch_size: int = 32
     global_step: int = 5000
-    log_every: float = 100
+    log_every: int = 100
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "Experiment":
@@ -197,14 +197,14 @@ class Experiment(BaseModel):
                             f"{self.experiment_name}_{step}_model.pkl", overwrite=True
                         )
 
-                        wandb.save(f"{self.experiment_name}_{step}_model.pkl")
-                    wandb.log(
+                        wandb_save(f"{self.experiment_name}_{step}_model.pkl")
+                    wandb_log(
                         {
                             "test_loss": float(test_loss_accumulator)
                             / test_iterator.num_batches
                         },
                         step=step,
                     )
-                    wandb.log({"test_accuracy": float(test_accuracy)}, step=step)
+                    wandb_log({"test_accuracy": float(test_accuracy)}, step=step)
                 yield UpdateState(step=step, loss=batch_loss, model=model)
                 step += 1
