@@ -80,6 +80,19 @@ class Experiment(BaseModel):
             d = json.load(infile)
             return cls.from_dict(d)
 
+    @classmethod
+    def from_flattened(cls, config: Dict[str, Any]) -> "Experiment":
+        nested_fields = [field for field in config.keys() if "." in field]
+
+        for field in nested_fields:
+            new_field, inner_field = field.split(".", 1)
+            if new_field not in config.keys():
+                config[new_field] = {}
+            config[new_field].update({inner_field: config[field]})
+            del config[field]
+
+        return cls(**config)
+
     def get_rng_keys(self, num: int = 1) -> Tensor:
         # breakpoint()
         if getattr(self, "key", None) is None:

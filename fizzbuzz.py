@@ -58,7 +58,7 @@ config = {
     },
     "learing_rate": 0.01,
     "batch_size": 32,
-    "global_step": 50000,
+    "global_step": 2000,
     "log_every": 100,
 }
 
@@ -66,7 +66,7 @@ wandb.init(project="colin_net_fizzbuzz", config=config, save_code=True)
 config = wandb.config
 
 
-experiment = Experiment(**config)
+experiment = Experiment.from_flattened(config)
 
 print(json.dumps(experiment.dict(), indent=4))
 

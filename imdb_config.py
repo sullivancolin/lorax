@@ -79,7 +79,7 @@ config = {
 wandb.init(project="colin_net_lstm", config=config, save_code=True)
 config = wandb.config
 
-experiment = Experiment(**config)
+experiment = Experiment.from_flattened(config)
 
 print(json.dumps(experiment.dict(), indent=4))
 

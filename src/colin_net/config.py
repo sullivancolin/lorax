@@ -4,7 +4,7 @@ from typing import Optional
 from pydantic import BaseModel
 
 from colin_net.layers import ActivationEnum, InitializerEnum
-from colin_net.nn import MLP, BiLSTMClassifier, LSTMClassifier, Model
+from colin_net.nn import MLP, LSTMClassifier, Model
 from colin_net.tensor import Tensor
 
 

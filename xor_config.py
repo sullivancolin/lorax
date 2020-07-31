@@ -40,9 +40,7 @@ config = {
 wandb.init(project="colin_net_xor", config=config, save_code=True)
 config = wandb.config
 
-breakpoint()
-
-experiment = Experiment(**config)
+experiment = Experiment.from_flattened(config)
 
 print(json.dumps(experiment.dict(), indent=4))
 
