@@ -10,6 +10,7 @@ from typing import Any, Iterator, List
 import jax.numpy as np
 import numpy as onp
 from jax import random
+from tokenizers import Tokenizer
 
 from colin_net.tensor import Tensor
 
@@ -65,13 +66,19 @@ class BatchIterator(DataIterator):
 class PaddedIterator(DataIterator):
     def __init__(
         self,
-        inputs: List[List[int]],
-        targets: List[List[int]],
+        inputs: List[str],
+        targets: List[Tensor],
         key: Tensor,
+        tokenizer: Tokenizer,
+        max_len: int = 200,
         batch_size: int = 32,
     ) -> None:
         self.inputs = inputs
         self.targets = np.array(onp.array(targets))
+        tokenizer.enable_truncation(max_len)
+        tokenizer.enable_padding()
+        self.tokenizer = tokenizer
+        self.max_len = max_len
         self.batch_size = batch_size
         self.key = key
         self.len = len(self.inputs)
@@ -79,14 +86,6 @@ class PaddedIterator(DataIterator):
 
     def __len__(self) -> int:
         return self.len
-
-    def left_pad_batch(self, batch_inputs: List[List[int]]) -> Tensor:
-        max_len = max(len(sentence) for sentence in batch_inputs)
-        batch = onp.zeros(shape=(len(batch_inputs), max_len), dtype=np.int8)
-        for i, sentence in enumerate(batch_inputs):
-            sentence_length = len(sentence)
-            batch[i, -sentence_length:] = sentence
-        return np.array(batch)
 
     def __iter__(self) -> Iterator[Batch]:
         starts = np.arange(0, len(self.inputs), self.batch_size)
@@ -98,7 +97,15 @@ class PaddedIterator(DataIterator):
             batch_inputs = self.inputs[start:end]
             batch_targets = self.targets[start:end]
 
-            padded_inputs = self.left_pad_batch(batch_inputs)
+            padded_inputs = np.array(
+                [
+                    item.ids[-self.max_len :]
+                    if item.ids[-1] != 0
+                    else item.ids[: self.max_len]
+                    for item in self.tokenizer.encode_batch(batch_inputs)
+                ]
+            )
+
             yield Batch(padded_inputs, batch_targets)
 
 

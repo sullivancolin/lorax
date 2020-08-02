@@ -1,9 +1,10 @@
 import gzip
 import json
-from typing import Iterator, List, Tuple
+from typing import Iterator, Tuple
 
 import numpy as onp
 import wandb
+from tokenizers import Tokenizer
 from tqdm.autonotebook import tqdm
 
 from colin_net.tensor import Tensor
@@ -13,11 +14,10 @@ from colin_net.train import Experiment, wandb_notes
 class LabeledCorpus:
     def __init__(self, filename: str, max_len: int = 500) -> None:
         self.filename = filename
-        self.max_len = max_len
         with gzip.open(self.filename) as infile:
             self.len = sum(1 for line in infile)
 
-    def __iter__(self) -> Iterator[Tuple[Tensor, List[int]]]:
+    def __iter__(self) -> Iterator[Tuple[Tensor, str]]:
 
         with gzip.open(self.filename) as infile:
             for line in tqdm(infile, total=self.len, desc=f"{self.filename} Corpus"):
@@ -27,9 +27,7 @@ class LabeledCorpus:
                 else:
                     label_tensor = onp.array([0, 1])
 
-                doc_tensor = [int(idno) for idno in doc.split()]
-                doc_tensor = doc_tensor[-self.max_len :]
-                yield label_tensor, doc_tensor
+                yield label_tensor, doc.lower()
 
 
 train_file = "imdb_train.txt.gz"
@@ -51,15 +49,8 @@ for label, doc in test_corpus:
     test_targets.append(label)
     test_inputs.append(doc)
 
-
-VOCAB_SIZE = 15001
-
-with open("imdb_tokenizer.vocab") as infile:
-    vocab = ["PAD"]
-    for line in infile:
-        vocab.append(line.strip().split()[0])
-
-assert len(vocab) == VOCAB_SIZE
+tokenizer = Tokenizer.from_file("rust_tokenizer.json")
+VOCAB_SIZE = len(tokenizer.get_vocab())
 
 
 config = {
@@ -89,6 +80,7 @@ update_generator = experiment.train(
     test_X=test_inputs,
     test_Y=test_targets,
     iterator_type="padded_iterator",
+    tokenizer=tokenizer,
 )
 
 bar = tqdm(total=experiment.global_step)

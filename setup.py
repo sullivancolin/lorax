@@ -8,6 +8,7 @@ requirements = [
     "jaxlib>=0.1.45",
     "tqdm>=4.45.0",
     "pydantic>=1.5.1",
+    "tokenizers>=0.8.1",
     "wandb>=0.9.4",
 ]
 

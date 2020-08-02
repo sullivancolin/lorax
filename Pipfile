@@ -20,7 +20,6 @@ black = "==19.10b0"
 [packages]
 colin_net = {editable = true,path = "."}
 jupyterlab = "*"
-sentencepiece = "*"
 ipywidgets = "*"
 plotly = "*"
 pandas = "*"

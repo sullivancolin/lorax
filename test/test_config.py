@@ -1,5 +1,7 @@
+from typing import Any, Dict
+
 import pytest
-from typing import Dict, Any
+
 from colin_net.train import Experiment
 
 
@@ -62,4 +64,3 @@ def test_unflattening(
     normal_exp = Experiment(**normal_config)
     unflattened_exp = Experiment.from_flattened(flattened_config)
     assert normal_exp.dict() == unflattened_exp.dict()
-

@@ -7,6 +7,7 @@ import wandb
 from jax import random
 from jax.tree_util import tree_flatten
 from pydantic import BaseModel
+from tokenizers import Tokenizer
 
 from colin_net.config import LSTMConfig, MLPConfig
 from colin_net.data import ITERATORS, DataIterator, IteratorEnum
@@ -121,12 +122,26 @@ class Experiment(BaseModel):
         return optimizer_class.initialize(model, loss, self.learning_rate)
 
     def create_iterator(
-        self, iterator_type: str, inputs: Any, targets: Any, batch_size: int
+        self,
+        iterator_type: str,
+        inputs: Any,
+        targets: Any,
+        batch_size: int,
+        tokenizer: Tokenizer = None,
     ) -> DataIterator:
         subkey = self.get_rng_keys()
-        return ITERATORS[iterator_type](
-            inputs=inputs, targets=targets, key=subkey, batch_size=self.batch_size
-        )
+        if not tokenizer:
+            return ITERATORS[iterator_type](
+                inputs=inputs, targets=targets, key=subkey, batch_size=self.batch_size
+            )
+        else:
+            return ITERATORS[iterator_type](
+                inputs=inputs,
+                targets=targets,
+                key=subkey,
+                batch_size=self.batch_size,
+                tokenizer=tokenizer,
+            )
 
     def train(
         self,
@@ -135,6 +150,7 @@ class Experiment(BaseModel):
         test_X: Sequence[Any],
         test_Y: Sequence[Any],
         iterator_type: str = IteratorEnum.batch_iterator,
+        tokenizer: Tokenizer = None,
     ) -> Iterator[UpdateState]:
 
         model = self.create_model()
@@ -145,10 +161,10 @@ class Experiment(BaseModel):
 
         # Instantiate the data Iterators
         train_iterator = self.create_iterator(
-            iterator_type, train_X, train_Y, self.batch_size
+            iterator_type, train_X, train_Y, self.batch_size, tokenizer
         )
         test_iterator = self.create_iterator(
-            iterator_type, test_X, test_Y, self.batch_size
+            iterator_type, test_X, test_Y, self.batch_size, tokenizer
         )
 
         step = 1
