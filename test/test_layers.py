@@ -1,11 +1,12 @@
 import jax.numpy as np
 import pytest
-from jax import random, vmap
+from jax import random
 from numpy import testing
 
-from colin_net.base import RNGWrapper, Tensor
-from colin_net.layers import Dropout, Embedding, Linear
-from colin_net.nn import MLP
+from colin_net.models import MLP
+from colin_net.nn.layers import Dropout, Embedding
+from colin_net.rng import RNG
+from colin_net.tensor import Tensor
 
 
 @pytest.fixture
@@ -19,12 +20,12 @@ def batched_inputs(single_input: Tensor) -> Tensor:
 
 
 @pytest.fixture
-def rng() -> RNGWrapper:
-    return RNGWrapper.from_prng(random.PRNGKey(42))
+def rng() -> RNG:
+    return RNG.from_prng(random.PRNGKey(42))
 
 
 @pytest.fixture
-def dropout(rng: RNGWrapper) -> Dropout:
+def dropout(rng: RNG) -> Dropout:
     return Dropout(keep=0.5, mode="train", rng=rng)
 
 
@@ -73,7 +74,7 @@ def test_mlp_dropout(batched_inputs: Tensor, dropout: Dropout) -> None:
 
 
 @pytest.fixture
-def embedding(rng: RNGWrapper) -> Embedding:
+def embedding(rng: RNG) -> Embedding:
     return Embedding(
         embedding_matrix=np.array(
             [[1.0, 1.0, 1.0, 1.0], [2.0, 2.0, 2.0, 2.0], [3.0, 3.0, 3.0, 3.0]]

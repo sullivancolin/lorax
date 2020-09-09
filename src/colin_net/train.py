@@ -1,15 +1,19 @@
 import json
 from collections import Counter
-from typing import Any, Dict, Iterator, Optional, Sequence, Type, Union
+from typing import Any, Dict, Iterator, Optional, Sequence, Tuple, Union
 
 import jax.numpy as np
-import wandb
-from jax import random
 from jax.tree_util import tree_flatten
 from pydantic import BaseModel
 from tokenizers import Tokenizer
 
-from colin_net.config import LSTMConfig, MLPConfig
+import wandb
+from colin_net.config import (
+    BiLSTMClassifierConfig,
+    LSTMClassifierConfig,
+    LSTMSequenceTaggerConfig,
+    MLPConfig,
+)
 from colin_net.data import ITERATORS, DataIterator, IteratorEnum
 from colin_net.loss import (
     LOSS_FUNCTIONS,
@@ -19,9 +23,9 @@ from colin_net.loss import (
     RegularizationEnum,
 )
 from colin_net.metrics import accuracy
-from colin_net.nn import Model
+from colin_net.models import Model
 from colin_net.optim import OPTIMIZERS, Optimizer, OptimizerEnum
-from colin_net.tensor import Tensor
+from colin_net.rng import RNG
 
 
 def wandb_log(d: Dict[str, Any], step: int) -> None:
@@ -46,6 +50,29 @@ def wandb_save(filename: str) -> None:
         pass
 
 
+def log_grads(grads: Model, step: int) -> None:
+    params, _ = tree_flatten(grads)
+    layer_names = grads.get_layer_names()
+    if len(layer_names) != len(set(layer_names)):
+
+        counts: Counter = Counter(layer_names)
+        incrementer: Counter = Counter()
+        for weights, name in zip(params, layer_names):
+
+            if counts[name] > 0:
+                incrementer[name] += 1
+                counts[name] -= 1
+                name = f"{name}_{incrementer[name]}"
+            wandb_log(
+                {f"grad/{name}": wandb.Histogram(weights)}, step=step,
+            )
+    else:
+        for weights, name in zip(params, layer_names):
+            wandb_log(
+                {f"grad/{name}": wandb.Histogram(weights)}, step=step,
+            )
+
+
 class UpdateState(BaseModel):
     class Config:
         arbitrary_types_allowed = True
@@ -61,7 +88,12 @@ class Experiment(BaseModel):
         extra = "allow"
 
     experiment_name: str
-    model_config: Union[MLPConfig, LSTMConfig]
+    model_config: Union[
+        MLPConfig,
+        LSTMClassifierConfig,
+        BiLSTMClassifierConfig,
+        LSTMSequenceTaggerConfig,
+    ]
     random_seed: int = 42
     loss: LossEnum = LossEnum.mean_squared_error
     regularization: Optional[RegularizationEnum] = None
@@ -94,21 +126,15 @@ class Experiment(BaseModel):
 
         return cls(**config)
 
-    def get_rng_keys(self, num: int = 1) -> Tensor:
-        # breakpoint()
-        if getattr(self, "key", None) is None:
-            self.key: Tensor = random.PRNGKey(self.random_seed)
-        keys = random.split(self.key, num=num + 1)
-        if num > 1:
-            subkeys = keys[1:]
-        else:
-            subkeys = keys[1]
-        self.key = keys[0]
-        return subkeys
+    def split_rng(self, num: int = 2) -> Tuple[RNG, ...]:
+        if getattr(self, "rng", None) is None:
+            self.rng: RNG = RNG.from_seed(self.random_seed)
+        rngs = self.rng.split(num=num)
+        return rngs
 
     def create_model(self) -> Model:
-        subkey = self.get_rng_keys()
-        return self.model_config.initialize(subkey)
+        self.rng, new_rng = self.split_rng()
+        return self.model_config.initialize(new_rng)
 
     def create_loss_func(self) -> Loss:
         if self.regularization:
@@ -118,7 +144,7 @@ class Experiment(BaseModel):
         return loss
 
     def create_optimizer(self, model: Model, loss: Loss) -> Optimizer:
-        optimizer_class: Type[Optimizer] = OPTIMIZERS[self.optimizer]
+        optimizer_class = OPTIMIZERS[self.optimizer]
         return optimizer_class.initialize(model, loss, self.learning_rate)
 
     def create_iterator(
@@ -126,19 +152,18 @@ class Experiment(BaseModel):
         iterator_type: str,
         inputs: Any,
         targets: Any,
-        batch_size: int,
         tokenizer: Tokenizer = None,
     ) -> DataIterator:
-        subkey = self.get_rng_keys()
+        self.rng, new_rng = self.split_rng()
         if not tokenizer:
             return ITERATORS[iterator_type](
-                inputs=inputs, targets=targets, key=subkey, batch_size=self.batch_size
+                inputs=inputs, targets=targets, rng=new_rng, batch_size=self.batch_size
             )
         else:
             return ITERATORS[iterator_type](
                 inputs=inputs,
                 targets=targets,
-                key=subkey,
+                rng=new_rng,
                 batch_size=self.batch_size,
                 tokenizer=tokenizer,
             )
@@ -161,11 +186,9 @@ class Experiment(BaseModel):
 
         # Instantiate the data Iterators
         train_iterator = self.create_iterator(
-            iterator_type, train_X, train_Y, self.batch_size, tokenizer
+            iterator_type, train_X, train_Y, tokenizer
         )
-        test_iterator = self.create_iterator(
-            iterator_type, test_X, test_Y, self.batch_size, tokenizer
-        )
+        test_iterator = self.create_iterator(iterator_type, test_X, test_Y, tokenizer)
 
         step = 1
         train_loss_accumulator = 0.0
@@ -176,29 +199,11 @@ class Experiment(BaseModel):
                 model = model.to_train()
                 batch_loss, model = optimizer.step(batch.inputs, batch.targets)
                 grads = optimizer.grads
-                params, _ = tree_flatten(grads)
-                layer_names = model.get_names()
-                if len(layer_names) != len(set(layer_names)):
-
-                    counts = Counter(layer_names)
-                    incrementer: Counter = Counter()
-                    for weights, name in zip(params, layer_names):
-
-                        if counts[name] > 0:
-                            incrementer[name] += 1
-                            counts[name] -= 1
-                            new_name = f"{name}_{incrementer[name]}"
-                        wandb_log(
-                            {f"grad/{new_name}": wandb.Histogram(weights)}, step=step,
-                        )
-                else:
-                    for weights, name in zip(params, layer_names):
-                        wandb_log(
-                            {f"grad/{name}": wandb.Histogram(weights)}, step=step,
-                        )
 
                 train_loss_accumulator += batch_loss
                 if step % self.log_every == 0:
+
+                    log_grads(grads, step)
                     wandb_log(
                         {"train_loss": float(train_loss_accumulator / self.log_every)},
                         step=step,

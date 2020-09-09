@@ -3,11 +3,11 @@ A tensor is just a n-dimensional array
 """
 from typing import Callable, Dict, Generator
 
+import jax.numpy as jnp
 import numpy as np
-from jax.interpreters.xla import DeviceArray
 
 
-class Tensor(DeviceArray):
+class Tensor(jnp.DeviceArray):
     @classmethod
     def __get_validators__(cls) -> Generator[Callable, None, None]:
         # one or more validators may be yielded which will be called in the
@@ -23,7 +23,11 @@ class Tensor(DeviceArray):
 
     @classmethod
     def validate(cls, v: "Tensor") -> "Tensor":
-        if not (isinstance(v, DeviceArray) or isinstance(v, np.ndarray)):
+        if not (
+            isinstance(v, jnp.DeviceArray)
+            or isinstance(v, np.ndarray)
+            or isinstance(v, jnp.ndarray)
+        ):
             raise TypeError("Tensor (jax.ndarray) required")
         return v
 

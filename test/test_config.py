@@ -10,10 +10,10 @@ def flattened_config() -> Dict[str, Any]:
     return {
         "experiment_name": "fizzbuzz",
         "model_config": {
+            "kind": "MLP",
             "input_dim": 10,
             "output_dim": 4,
-            "hidden_dim": 50,
-            "num_hidden": 2,
+            "hidden_sizes": [50],
             "activation": "tanh",
             "dropout_keep": None,
             "initializer": "normal",
@@ -38,10 +38,10 @@ def normal_config() -> Dict[str, Any]:
     return {
         "experiment_name": "fizzbuzz",
         "model_config": {
+            "kind": "MLP",
             "input_dim": 10,
             "output_dim": 4,
-            "hidden_dim": 2,
-            "num_hidden": 8,
+            "hidden_sizes": [50],
             "activation": "relu",
             "dropout_keep": None,
             "initializer": "normal",

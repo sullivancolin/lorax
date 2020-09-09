@@ -12,6 +12,7 @@ import numpy as onp
 from jax import random
 from tokenizers import Tokenizer
 
+from colin_net.rng import RNG
 from colin_net.tensor import Tensor
 
 
@@ -39,12 +40,12 @@ class DataIterator:
 
 class BatchIterator(DataIterator):
     def __init__(
-        self, inputs: Tensor, targets: Tensor, key: Tensor, batch_size: int = 32,
+        self, inputs: Tensor, targets: Tensor, rng: RNG, batch_size: int = 32,
     ) -> None:
         self.inputs = inputs
         self.targets = targets
         self.batch_size = batch_size
-        self.key = key
+        self.rng = rng
         self.len = len(self.inputs)
         self.num_batches = math.ceil(self.len / batch_size)
 
@@ -53,8 +54,8 @@ class BatchIterator(DataIterator):
 
     def __iter__(self) -> Iterator[Batch]:
         starts = np.arange(0, len(self.inputs), self.batch_size)
-        self.key, subkey = random.split(self.key)
-        starts = random.permutation(subkey, starts)
+        self.rng, new_rng = self.rng.split()
+        starts = random.permutation(new_rng.to_prng(), starts)
 
         for start in starts:
             end = start + self.batch_size
@@ -68,7 +69,7 @@ class PaddedIterator(DataIterator):
         self,
         inputs: List[str],
         targets: List[Tensor],
-        key: Tensor,
+        rng: RNG,
         tokenizer: Tokenizer,
         max_len: int = 200,
         batch_size: int = 32,
@@ -80,7 +81,7 @@ class PaddedIterator(DataIterator):
         self.tokenizer = tokenizer
         self.max_len = max_len
         self.batch_size = batch_size
-        self.key = key
+        self.rng = rng
         self.len = len(self.inputs)
         self.num_batches = math.ceil(self.len / batch_size)
 
@@ -90,8 +91,8 @@ class PaddedIterator(DataIterator):
     def __iter__(self) -> Iterator[Batch]:
         starts = np.arange(0, len(self.inputs), self.batch_size)
 
-        self.key, subkey = random.split(self.key)
-        starts = random.permutation(subkey, starts)
+        self.rng, new_rng = self.rng.split()
+        starts = random.permutation(new_rng.to_prng(), starts)
         for start in starts:
             end = start + self.batch_size
             batch_inputs = self.inputs[start:end]

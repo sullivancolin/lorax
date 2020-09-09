@@ -11,9 +11,9 @@ import json
 from typing import List
 
 import jax.numpy as np
-import wandb
 from tqdm.autonotebook import tqdm
 
+import wandb
 from colin_net.metrics import accuracy
 from colin_net.train import Experiment, wandb_log, wandb_notes
 
@@ -45,20 +45,20 @@ test_y = np.array([fizz_buzz_encode(x) for x in range(1, 101)])
 config = {
     "experiment_name": "fizzbuzz",
     "random_seed": 42,
-    "loss": "mean_squared_error",
+    "loss": "cross_entropy",
     "regularization": None,
-    "optimizer": "sgd",
+    "optimizer": "adam",
     "model_config": {
+        "kind": "MLP",
         "input_dim": 10,
         "output_dim": 4,
-        "hidden_dim": 50,
-        "num_hidden": 2,
+        "hidden_sizes": [50],
         "activation": "tanh",
         "dropout_keep": None,
     },
-    "learing_rate": 0.01,
+    "learing_rate": 0.001,
     "batch_size": 32,
-    "global_step": 2000,
+    "global_step": 5000,
     "log_every": 100,
 }
 

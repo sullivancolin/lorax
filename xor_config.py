@@ -5,9 +5,9 @@ learned with a simple linear model is XOR
 import json
 
 import jax.numpy as np
-import wandb
 from tqdm.autonotebook import tqdm
 
+import wandb
 from colin_net.metrics import accuracy
 from colin_net.train import Experiment, wandb_log, wandb_notes
 
@@ -19,18 +19,18 @@ targets = np.array([[1, 0], [0, 1], [0, 1], [1, 0]])
 config = {
     "experiment_name": "xor_runs",
     "model_config": {
+        "kind": "MLP",
         "output_dim": 2,
         "input_dim": 2,
-        "hidden_dim": 2,
-        "num_hidden": 2,
+        "hidden_sizes": [2],
         "activation": "tanh",
         "dropout_keep": None,
     },
     "random_seed": 42,
     "loss": "mean_squared_error",
     "regularization": None,
-    "optimizer": "sgd",
-    "learning_rate": 0.001,
+    "optimizer": "adam",
+    "learning_rate": 0.01,
     "batch_size": 4,
     "global_step": 5000,
     "log_every": 50,

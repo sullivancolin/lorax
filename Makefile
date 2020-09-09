@@ -32,7 +32,7 @@ lint: clean
 	pipenv run isort .
 	pipenv run black .
 	pipenv run flake8 . --exit-zero
-	pipenv run mypy .
+	pipenv run mypy src
 
 ## run tests with the default Python
 test: lint

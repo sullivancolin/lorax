@@ -3,10 +3,10 @@ import json
 from typing import Iterator, Tuple
 
 import numpy as onp
-import wandb
 from tokenizers import Tokenizer
 from tqdm.autonotebook import tqdm
 
+import wandb
 from colin_net.tensor import Tensor
 from colin_net.train import Experiment, wandb_notes
 
@@ -55,7 +55,13 @@ VOCAB_SIZE = len(tokenizer.get_vocab())
 
 config = {
     "experiment_name": "imdb_lstm",
-    "model_config": {"output_dim": 2, "vocab_size": VOCAB_SIZE, "hidden_dim": 200},
+    "model_config": {
+        "kind": "LSTMClassifier",
+        "output_dim": 2,
+        "embedding_dim": 200,
+        "vocab_size": VOCAB_SIZE,
+        "hidden_dim": 300,
+    },
     "random_seed": 42,
     "iterator_type": "padded_iterator",
     "loss": "cross_entropy",
