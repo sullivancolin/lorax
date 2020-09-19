@@ -4,7 +4,7 @@ It behaves a lot like a layer itself.
 """
 from typing import Any, Dict
 
-from jax import jit, nn, vmap
+from jax import jit, vmap
 
 from colin_net.models import Model
 from colin_net.nn.layers import LSTM, ActivationEnum, BiLSTM, Embedding, Linear
@@ -63,13 +63,6 @@ class LSTMClassifier(Model):
     @jit
     def __call__(self, batched_sequence_ids: Tensor) -> Tensor:
         return vmap(self.predict)(batched_sequence_ids)
-
-    @jit
-    def predict_proba(self, inputs: Tensor) -> Tensor:
-        if self.output_dim > 1:
-            return nn.softmax(self.__call__(inputs))
-        else:
-            return nn.sigmoid(self.__call__(inputs))
 
     def trainable_params(self) -> Dict[str, Any]:
         return {
@@ -134,13 +127,6 @@ class BiLSTMClassifier(Model):
     @jit
     def __call__(self, batched_sequence_ids: Tensor) -> Tensor:
         return vmap(self.predict)(batched_sequence_ids)
-
-    @jit
-    def predict_proba(self, inputs: Tensor) -> Tensor:
-        if self.output_dim > 1:
-            return nn.softmax(self.__call__(inputs))
-        else:
-            return nn.sigmoid(self.__call__(inputs))
 
     def trainable_params(self) -> Dict[str, Any]:
         return {

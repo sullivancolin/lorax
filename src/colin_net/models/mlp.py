@@ -38,13 +38,6 @@ class MLP(Model):
 
         return vmap(self.predict)(batched_inputs)
 
-    @jit
-    def predict_proba(self, inputs: Tensor) -> Tensor:
-        if self.output_dim > 1:
-            return nn.softmax(self.__call__(inputs))
-        else:
-            return nn.sigmoid(self.__call__(inputs))
-
     def _set_mode(self, mode: Mode = Mode.train) -> "MLP":
         new_layers: List[Layer] = []
         for layer in self.layers:

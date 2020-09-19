@@ -1,6 +1,4 @@
 """
-A Model is just a collection of layers.
-It behaves a lot like a layer itself.
 """
 import pickle
 from abc import abstractmethod
@@ -11,6 +9,7 @@ from typing import Any, Dict, List, Type, TypeVar, Union
 import numpy as onp
 from jax.interpreters.xla import DeviceArray
 from jax.tree_util import tree_flatten
+from jax import jit, nn
 
 from colin_net.nn.layers import Layer
 from colin_net.tensor import Tensor
@@ -31,8 +30,9 @@ def flatten_layer_names(d: Dict[str, Any]) -> List[str]:
             keys.extend([key for ls in v for key in flatten_layer_names(ls)])
     return keys
 
-
 class Model(Layer, is_abstract=True):
+    output_dim: int
+    input_dim: int
 
     """Abstract Class for a Model. Enforces subclasses to implement
     __call__, train_params, static_params"""
@@ -46,6 +46,13 @@ class Model(Layer, is_abstract=True):
 
     def to_eval(self) -> "Model":
         return self
+
+    @jit
+    def predict_proba(self, inputs: Tensor) -> Tensor:
+        if self.output_dim > 1:
+            return nn.softmax(self.__call__(inputs))
+        else:
+            return nn.sigmoid(self.__call__(inputs))
 
     def save(self, path: Union[str, Path], overwrite: bool = False) -> None:
         path = Path(path)
@@ -70,10 +77,6 @@ class Model(Layer, is_abstract=True):
         with open(path, "rb") as file:
             instance = pickle.load(file)
         return instance
-
-    @classmethod
-    def load_state_dict(cls: Type[T], state_dict: Dict[str, Any]) -> T:
-        return cls(**state_dict)
 
     def get_layer_names(self) -> List[str]:
         d = self.dict()
