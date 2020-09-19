@@ -8,8 +8,8 @@ import jax.numpy as np
 from tqdm.autonotebook import tqdm
 
 import wandb
-from colin_net.metrics import accuracy
-from colin_net.train import Experiment, wandb_log, wandb_notes
+from lorax.metrics import accuracy
+from lorax.train import Experiment, wandb_log, wandb_notes
 
 # Create Input Data and True Labels
 inputs = np.array([[0, 0], [1, 0], [0, 1], [1, 1]])

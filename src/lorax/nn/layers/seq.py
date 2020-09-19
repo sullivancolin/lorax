@@ -3,10 +3,10 @@ from typing import Any, Dict, Tuple
 import jax.numpy as np
 from jax import jit, lax, nn, ops
 
-from colin_net.nn.initilizers import INITIALIZERS, InitializerEnum
-from colin_net.nn.layers.core import Layer
-from colin_net.rng import RNG
-from colin_net.tensor import Tensor
+from lorax.nn.initilizers import INITIALIZERS, InitializerEnum
+from lorax.nn.layers.core import Layer
+from lorax.rng import RNG
+from lorax.tensor import Tensor
 
 
 class Embedding(Layer):

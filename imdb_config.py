@@ -7,8 +7,8 @@ from tokenizers import Tokenizer
 from tqdm.autonotebook import tqdm
 
 import wandb
-from colin_net.tensor import Tensor
-from colin_net.train import Experiment, wandb_notes
+from lorax.tensor import Tensor
+from lorax.train import Experiment, wandb_notes
 
 
 class LabeledCorpus:
@@ -28,6 +28,52 @@ class LabeledCorpus:
                     label_tensor = onp.array([0, 1])
 
                 yield label_tensor, doc.lower()
+
+
+# class PaddedIterator(DataIterator):
+#     def __init__(
+#         self,
+#         inputs: List[str],
+#         targets: List[Tensor],
+#         rng: RNG,
+#         max_len: int = 200,
+#         batch_size: int = 32,
+#     ) -> None:
+#         self.inputs = inputs
+#         self.targets = np.array(onp.array(targets))
+#         tokenizer.enable_truncation(max_len)
+#         tokenizer.enable_padding()
+#         self.tokenizer = tokenizer
+#         self.max_len = max_len
+#         self.batch_size = batch_size
+#         self.rng = rng
+#         self.len = len(self.inputs)
+#         self.num_batches = math.ceil(self.len / batch_size)
+
+#     def __len__(self) -> int:
+#         return self.len
+
+#     def __iter__(self) -> Iterator[Batch]:
+#         starts = np.arange(0, len(self.inputs), self.batch_size)
+
+#         self.rng, new_rng = self.rng.split()
+#         starts = random.permutation(new_rng.to_prng(), starts)
+#         for start in starts:
+#             end = start + self.batch_size
+#             batch_inputs = self.inputs[start:end]
+#             batch_targets = self.targets[start:end]
+
+#             padded_inputs = np.array(
+#                 [
+#                     item.ids[-self.max_len :]
+#                     if item.ids[-1] != 0
+#                     else item.ids[: self.max_len]
+#                     for item in self.tokenizer.encode_batch(batch_inputs)
+#                 ]
+#             )
+
+#             yield Batch(padded_inputs, batch_targets)
+
 
 
 train_file = "imdb_train.txt.gz"

@@ -7,12 +7,12 @@ from pathlib import Path
 from typing import Any, Dict, List, Type, TypeVar, Union
 
 import numpy as onp
+from jax import jit, nn
 from jax.interpreters.xla import DeviceArray
 from jax.tree_util import tree_flatten
-from jax import jit, nn
 
-from colin_net.nn.layers import Layer
-from colin_net.tensor import Tensor
+from lorax.nn.layers import Layer
+from lorax.tensor import Tensor
 
 suffix = ".pkl"
 
@@ -29,6 +29,7 @@ def flatten_layer_names(d: Dict[str, Any]) -> List[str]:
         elif isinstance(v, list):
             keys.extend([key for ls in v for key in flatten_layer_names(ls)])
     return keys
+
 
 class Model(Layer, is_abstract=True):
     output_dim: int

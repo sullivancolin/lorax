@@ -1,7 +1,7 @@
 import jax.numpy as np
 from jax import jit
 
-from colin_net.tensor import Tensor
+from lorax.tensor import Tensor
 
 
 @jit

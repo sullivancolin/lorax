@@ -8,9 +8,9 @@ from jax.experimental.optimizers import adam
 from jax.tree_util import tree_multimap
 from pydantic import BaseModel
 
-from colin_net.loss import Loss
-from colin_net.models import Model
-from colin_net.tensor import Tensor
+from lorax.loss import Loss
+from lorax.models import Model
+from lorax.tensor import Tensor
 
 LossGrad = Callable[[Model, Tensor, Tensor], Tuple[float, Model]]
 

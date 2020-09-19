@@ -16,6 +16,7 @@ pytest-sugar = "*"
 flake8-bugbear = "*"
 pytest-html = "*"
 black = "==19.10b0"
+mkdocs-material = "*"
 
 [packages]
 colin_net = {editable = true,path = "."}

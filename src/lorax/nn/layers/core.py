@@ -7,11 +7,11 @@ from typing import Any, Dict
 import jax.numpy as np
 from jax import jit, random
 
-from colin_net.module import Module
-from colin_net.nn.activations import ACTIVATIONS, ActivationEnum
-from colin_net.nn.initilizers import INITIALIZERS, InitializerEnum
-from colin_net.rng import RNG
-from colin_net.tensor import Tensor
+from lorax.module import Module
+from lorax.nn.activations import ACTIVATIONS, ActivationEnum
+from lorax.nn.initilizers import INITIALIZERS, InitializerEnum
+from lorax.rng import RNG
+from lorax.tensor import Tensor
 
 
 class Mode(str, Enum):

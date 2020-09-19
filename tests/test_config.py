@@ -2,7 +2,7 @@ from typing import Any, Dict
 
 import pytest
 
-from colin_net.train import Experiment
+from lorax.train import Experiment
 
 
 @pytest.fixture

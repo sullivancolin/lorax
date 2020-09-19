@@ -20,17 +20,17 @@ with open("README.md") as infile:
     long_description = infile.read()
 
 setup(
-    name="colin_net",
+    name="lorax",
     version="0.0.1",
     description="Deep Learning Framework using Jax",
     long_description=long_description,
     long_description_content_type="text/markdown",
     author="Colin Sullivan",
     author_email="csulliva@brandeis.edu",
-    url="https://github.com/niloch/colin_net",
-    packages=find_packages(where="src", include=["colin_net"]),
+    url="https://github.com/niloch/lorax",
+    packages=find_packages(where="src", include=["lorax"]),
     package_dir={"": "src"},
-    package_data={"colin_net": ["py.typed"]},
+    package_data={"lorax": ["py.typed"]},
     include_package_data=True,
     install_requires=requirements,
     python_requires=">=3.7",

@@ -1,0 +1,28 @@
+site_name: lorax
+site_description: An Object Oriented Deep Learning framework based on Jax and Pydantic
+repo_url: https://github.com/niloch/lorax
+repo_name: lorax
+
+edit_uri: ''
+nav:
+    - Home: index.md
+theme:
+  name: 'material'
+  font:
+    code: 'Fira Code'
+  palette:
+    primary: 'blue grey'
+    accent: 'amber'
+  logo: 'images/lorax-thinking.png'
+  favicon: 'images/lorax-icons.png'
+
+markdown_extensions:
+  - codehilite
+  - admonition
+  - meta
+  - markdown.extensions.toc:
+      permalink: true
+      toc_depth: 3
+
+extra:
+    version: 0.0.1

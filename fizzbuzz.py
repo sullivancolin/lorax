@@ -14,8 +14,8 @@ import jax.numpy as np
 from tqdm.autonotebook import tqdm
 
 import wandb
-from colin_net.metrics import accuracy
-from colin_net.train import Experiment, wandb_log, wandb_notes
+from lorax.metrics import accuracy
+from lorax.train import Experiment, wandb_log, wandb_notes
 
 
 def fizz_buzz_encode(x: int) -> List[int]:

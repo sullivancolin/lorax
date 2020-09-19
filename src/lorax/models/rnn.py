@@ -2,14 +2,16 @@
 A Model is just a collection of layers.
 It behaves a lot like a layer itself.
 """
-from typing import Any, Dict
+from typing import Any, Dict, Type, TypeVar
 
 from jax import jit, vmap
 
-from colin_net.models import Model
-from colin_net.nn.layers import LSTM, ActivationEnum, BiLSTM, Embedding, Linear
-from colin_net.rng import RNG
-from colin_net.tensor import Tensor
+from lorax.models import Model
+from lorax.nn.layers import LSTM, ActivationEnum, BiLSTM, Embedding, Linear
+from lorax.rng import RNG
+from lorax.tensor import Tensor
+
+T = TypeVar("T", bound="LSTMClassifier")
 
 
 class LSTMClassifier(Model):
@@ -21,7 +23,7 @@ class LSTMClassifier(Model):
 
     @classmethod
     def initialize(
-        cls,
+        cls: Type[T],
         *,
         vocab_size: int,
         embedding_dim: int,
@@ -29,7 +31,7 @@ class LSTMClassifier(Model):
         output_dim: int,
         rng: RNG,
         **kwargs: Dict[str, Any]
-    ) -> "LSTMClassifier":
+    ) -> T:
         rng, new_rng = rng.split()
         embedding = Embedding.initialize(vocab_size, embedding_dim, new_rng)
 

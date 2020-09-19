@@ -12,8 +12,8 @@ import jax.numpy as np
 from jax import jit, nn
 from jax.tree_util import tree_flatten
 
-from colin_net.models import Model
-from colin_net.tensor import Tensor
+from lorax.models import Model
+from lorax.tensor import Tensor
 
 Loss = Callable[[Model, Tensor, Tensor], float]
 

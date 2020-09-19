@@ -2,10 +2,10 @@
 """
 from typing import Any, Dict, List
 
-from jax import jit, nn, vmap
+from jax import jit, vmap
 
-from colin_net.models import Model
-from colin_net.nn.layers import (
+from lorax.models import Model
+from lorax.nn.layers import (
     ActivationEnum,
     Dropout,
     InitializerEnum,
@@ -13,8 +13,8 @@ from colin_net.nn.layers import (
     Linear,
     Mode,
 )
-from colin_net.rng import RNG
-from colin_net.tensor import Tensor
+from lorax.rng import RNG
+from lorax.tensor import Tensor
 
 
 class MLP(Model):

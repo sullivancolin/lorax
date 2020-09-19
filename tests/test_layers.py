@@ -3,10 +3,10 @@ import pytest
 from jax import random
 from numpy import testing
 
-from colin_net.models import MLP
-from colin_net.nn.layers import Dropout, Embedding
-from colin_net.rng import RNG
-from colin_net.tensor import Tensor
+from lorax.models import MLP
+from lorax.nn.layers import Dropout, Embedding
+from lorax.rng import RNG
+from lorax.tensor import Tensor
 
 
 @pytest.fixture

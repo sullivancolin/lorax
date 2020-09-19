@@ -4,8 +4,8 @@ import jax.numpy as np
 from jax import random
 from numpy import ndarray
 
-from colin_net.module import Module
-from colin_net.tensor import Tensor
+from lorax.module import Module
+from lorax.tensor import Tensor
 
 
 class RNG(Module):

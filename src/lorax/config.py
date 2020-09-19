@@ -4,17 +4,17 @@ from typing import List, Optional
 from pydantic import BaseModel
 from typing_extensions import Literal
 
-from colin_net.models import (
+from lorax.models import (
     MLP,
     BiLSTMClassifier,
     LSTMClassifier,
     LSTMSequenceTagger,
     Model,
 )
-from colin_net.nn.activations import ActivationEnum
-from colin_net.nn.initilizers import InitializerEnum
-from colin_net.rng import RNG
-from colin_net.tensor import Tensor
+from lorax.nn.activations import ActivationEnum
+from lorax.nn.initilizers import InitializerEnum
+from lorax.rng import RNG
+from lorax.tensor import Tensor
 
 
 class ModelConfig(BaseModel, ABC):

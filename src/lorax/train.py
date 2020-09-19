@@ -1,31 +1,30 @@
 import json
 from collections import Counter
-from typing import Any, Dict, Iterator, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, Iterator, Optional, Tuple, Union
 
 import jax.numpy as np
 from jax.tree_util import tree_flatten
 from pydantic import BaseModel
-from tokenizers import Tokenizer
 
 import wandb
-from colin_net.config import (
+from lorax.config import (
     BiLSTMClassifierConfig,
     LSTMClassifierConfig,
     LSTMSequenceTaggerConfig,
     MLPConfig,
 )
-from colin_net.data import ITERATORS, DataIterator, IteratorEnum
-from colin_net.loss import (
+from lorax.data import DataIterator
+from lorax.loss import (
     LOSS_FUNCTIONS,
     REGULARIZATIONS,
     Loss,
     LossEnum,
     RegularizationEnum,
 )
-from colin_net.metrics import accuracy
-from colin_net.models import Model
-from colin_net.optim import OPTIMIZERS, Optimizer, OptimizerEnum
-from colin_net.rng import RNG
+from lorax.metrics import accuracy
+from lorax.models import Model
+from lorax.optim import OPTIMIZERS, Optimizer, OptimizerEnum
+from lorax.rng import RNG
 
 
 def wandb_log(d: Dict[str, Any], step: int) -> None:
@@ -102,6 +101,7 @@ class Experiment(BaseModel):
     batch_size: int = 32
     global_step: int = 5000
     log_every: int = 100
+    eval: bool = False
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "Experiment":
@@ -147,35 +147,8 @@ class Experiment(BaseModel):
         optimizer_class = OPTIMIZERS[self.optimizer]
         return optimizer_class.initialize(model, loss, self.learning_rate)
 
-    def create_iterator(
-        self,
-        iterator_type: str,
-        inputs: Any,
-        targets: Any,
-        tokenizer: Tokenizer = None,
-    ) -> DataIterator:
-        self.rng, new_rng = self.split_rng()
-        if not tokenizer:
-            return ITERATORS[iterator_type](
-                inputs=inputs, targets=targets, rng=new_rng, batch_size=self.batch_size
-            )
-        else:
-            return ITERATORS[iterator_type](
-                inputs=inputs,
-                targets=targets,
-                rng=new_rng,
-                batch_size=self.batch_size,
-                tokenizer=tokenizer,
-            )
-
     def train(
-        self,
-        train_X: Sequence[Any],
-        train_Y: Sequence[Any],
-        test_X: Sequence[Any],
-        test_Y: Sequence[Any],
-        iterator_type: str = IteratorEnum.batch_iterator,
-        tokenizer: Tokenizer = None,
+        self, train_iterator: DataIterator, test_iterator: DataIterator
     ) -> Iterator[UpdateState]:
 
         model = self.create_model()
@@ -183,12 +156,6 @@ class Experiment(BaseModel):
         loss = self.create_loss_func()
 
         optimizer = self.create_optimizer(model, loss)
-
-        # Instantiate the data Iterators
-        train_iterator = self.create_iterator(
-            iterator_type, train_X, train_Y, tokenizer
-        )
-        test_iterator = self.create_iterator(iterator_type, test_X, test_Y, tokenizer)
 
         step = 1
         train_loss_accumulator = 0.0
@@ -201,44 +168,49 @@ class Experiment(BaseModel):
                 grads = optimizer.grads
 
                 train_loss_accumulator += batch_loss
-                if step % self.log_every == 0:
-
+                if step % 10 == 0:
                     log_grads(grads, step)
+
+                if step % self.log_every == 0:
                     wandb_log(
                         {"train_loss": float(train_loss_accumulator / self.log_every)},
                         step=step,
                     )
                     train_loss_accumulator = 0.0
 
-                    model = model.to_eval()
-                    test_loss_accumulator = 0.0
-                    test_pred_accumulator = []
-                    test_label_accumulator = []
-                    for test_batch in test_iterator:
-                        test_loss = loss(model, test_batch.inputs, test_batch.targets)
-                        test_label_accumulator.append(test_batch.targets)
-                        test_loss_accumulator += test_loss
-                        test_pred_accumulator.append(
-                            model.predict_proba(test_batch.inputs)
-                        )
-
-                    test_probs = np.vstack(test_pred_accumulator)
-                    test_labels = np.vstack(test_label_accumulator)
-                    test_accuracy = accuracy(test_labels, test_probs)
-                    if test_accuracy > prev_accuracy:
-                        prev_accuracy = test_accuracy
-                        model.save(
-                            f"{self.experiment_name}_{step}_model.pkl", overwrite=True
-                        )
-
-                        wandb_save(f"{self.experiment_name}_{step}_model.pkl")
-                    wandb_log(
-                        {
-                            "test_loss": float(test_loss_accumulator)
-                            / test_iterator.num_batches
-                        },
-                        step=step,
-                    )
-                    wandb_log({"test_accuracy": float(test_accuracy)}, step=step)
+                    if self.eval:
+                        self.do_eval(model, loss, test_iterator, step, prev_accuracy)
                 yield UpdateState(step=step, loss=batch_loss, model=model)
                 step += 1
+
+    def do_eval(
+        self,
+        model: Model,
+        loss: Loss,
+        test_iterator: DataIterator,
+        step: int,
+        prev_accuracy: float,
+    ) -> None:
+        model = model.to_eval()
+        test_loss_accumulator = 0.0
+        test_pred_accumulator = []
+        test_label_accumulator = []
+        for test_batch in test_iterator:
+            test_loss = loss(model, test_batch.inputs, test_batch.targets)
+            test_label_accumulator.append(test_batch.targets)
+            test_loss_accumulator += test_loss
+            test_pred_accumulator.append(model.predict_proba(test_batch.inputs))
+
+        test_probs = np.vstack(test_pred_accumulator)
+        test_labels = np.vstack(test_label_accumulator)
+        test_accuracy = accuracy(test_labels, test_probs)
+        if test_accuracy > prev_accuracy:
+            prev_accuracy = test_accuracy
+            model.save(f"{self.experiment_name}_{step}_model.pkl", overwrite=True)
+
+            wandb_save(f"{self.experiment_name}_{step}_model.pkl")
+        wandb_log(
+            {"test_loss": float(test_loss_accumulator) / test_iterator.num_batches},
+            step=step,
+        )
+        wandb_log({"test_accuracy": float(test_accuracy)}, step=step)
