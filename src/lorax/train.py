@@ -1,6 +1,6 @@
 import json
 from collections import Counter
-from typing import Any, Dict, Iterator, Optional, Tuple, Union
+from typing import Any, Dict, Iterator, Optional, Tuple, Union, List
 
 import jax.numpy as np
 from jax.tree_util import tree_flatten
@@ -25,6 +25,7 @@ from lorax.metrics import accuracy
 from lorax.models import Model
 from lorax.optim import OPTIMIZERS, Optimizer, OptimizerEnum
 from lorax.rng import RNG
+from lorax.tensor import Tensor
 
 
 def wandb_log(d: Dict[str, Any], step: int) -> None:
@@ -72,6 +73,29 @@ def log_grads(grads: Model, step: int) -> None:
             )
 
 
+def log_params(model: Model, step: int) -> None:
+    params, _ = tree_flatten(model)
+    layer_names = params.get_layer_names()
+    if len(layer_names) != len(set(layer_names)):
+
+        counts: Counter = Counter(layer_names)
+        incrementer: Counter = Counter()
+        for weights, name in zip(params, layer_names):
+
+            if counts[name] > 0:
+                incrementer[name] += 1
+                counts[name] -= 1
+                name = f"{name}_{incrementer[name]}"
+            wandb_log(
+                {f"params/{name}": wandb.Histogram(weights)}, step=step,
+            )
+    else:
+        for weights, name in zip(params, layer_names):
+            wandb_log(
+                {f"params/{name}": wandb.Histogram(weights)}, step=step,
+            )
+
+
 class UpdateState(BaseModel):
     class Config:
         arbitrary_types_allowed = True
@@ -101,6 +125,8 @@ class Experiment(BaseModel):
     batch_size: int = 32
     global_step: int = 5000
     log_every: int = 100
+    log_params: bool = False
+    log_grads: bool = True
     eval: bool = False
 
     @classmethod
@@ -159,8 +185,7 @@ class Experiment(BaseModel):
 
         step = 1
         train_loss_accumulator = 0.0
-
-        prev_accuracy = 0
+        prev_accuracy = 0.0
         while step < self.global_step:
             for batch in train_iterator:
                 model = model.to_train()
@@ -168,8 +193,10 @@ class Experiment(BaseModel):
                 grads = optimizer.grads
 
                 train_loss_accumulator += batch_loss
-                if step % 10 == 0:
+                if step % 10 == 0 and grads is not None:
                     log_grads(grads, step)
+                    if self.log_params:
+                        log_params(model, step)
 
                 if step % self.log_every == 0:
                     wandb_log(

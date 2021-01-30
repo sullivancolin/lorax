@@ -53,78 +53,56 @@ class FrozenEmbedding(Embedding):
 
 class LSTM(Layer):
 
-    Wf: Tensor
-    bf: Tensor
-    Wi: Tensor
-    bi: Tensor
-    Wc: Tensor
-    bc: Tensor
-    Wo: Tensor
-    bo: Tensor
+    U: Tensor
+    V: Tensor
+    b: Tensor
+
     h_prev: Tensor
     c_prev: Tensor
 
     @classmethod
     def initialize(cls, input_dim: int, hidden_dim: int, rng: RNG) -> "LSTM":
+        U_rng, V_rng = rng.split()
 
-        Wf_rng, Wi_rng, Wc_rng, Wo_rng = rng.split(num=4)
-
-        concat_size = input_dim + hidden_dim
-
-        Wf = nn.initializers.glorot_normal()(
-            Wf_rng.to_prng(), shape=(hidden_dim, concat_size)
+        U = nn.initializers.glorot_normal()(
+            U_rng.to_prng(), shape=(4 * hidden_dim, input_dim)
         )
-        bf = np.zeros(shape=(hidden_dim,))
 
-        Wi = nn.initializers.glorot_normal()(
-            Wi_rng.to_prng(), shape=(hidden_dim, concat_size)
+        V = nn.initializers.glorot_normal()(
+            V_rng.to_prng(), shape=(4 * hidden_dim, hidden_dim)
         )
-        bi = np.zeros(shape=(hidden_dim,))
 
-        Wc = nn.initializers.glorot_normal()(
-            Wc_rng.to_prng(), shape=(hidden_dim, concat_size)
-        )
-        bc = np.zeros(shape=(hidden_dim,))
+        # Forget bias is ones instead of zeros to start
+        b = np.zeros(shape=(3 * hidden_dim,))
+        b_f = np.ones(shape=(hidden_dim,))
 
-        Wo = nn.initializers.glorot_normal()(
-            Wo_rng.to_prng(), shape=(hidden_dim, concat_size)
-        )
-        bo = np.zeros(shape=(hidden_dim,))
+        b = np.hstack([b, b_f])
 
         h_prev = np.zeros(shape=(hidden_dim,))
         c_prev = np.zeros(shape=(hidden_dim,))
 
-        return cls(
-            Wf=Wf,
-            bf=bf,
-            Wi=Wi,
-            bi=bi,
-            Wc=Wc,
-            bc=bc,
-            Wo=Wo,
-            bo=bo,
-            c_prev=c_prev,
-            h_prev=h_prev,
-        )
+        return cls(U=U, V=V, b=b, h_prev=h_prev, c_prev=c_prev)
 
     @jit
     def time_step(
-        self, state: Tuple[Tensor, Tensor], inputs: Tensor
+        self, state: Tuple[Tensor, Tensor], embedding: Tensor
     ) -> Tuple[Tuple[Tensor, Tensor], Tensor]:
 
         h_prev, c_prev = state
-        concat_vec = np.hstack((inputs, h_prev))
 
-        f = nn.sigmoid(np.dot(self.Wf, concat_vec) + self.bf)
-        i = nn.sigmoid(np.dot(self.Wi, concat_vec) + self.bi)
-        C_bar = np.tanh(np.dot(self.Wc, concat_vec) + self.bc)
+        igof = self.U @ embedding + self.V @ h_prev + self.b
 
-        c = f * c_prev + i * C_bar
-        o = nn.sigmoid(np.dot(self.Wo, concat_vec) + self.bo)
-        h = o * np.tanh(c)
+        i, g, o, f = np.split(igof, 4, axis=1)
 
-        # hidden state vector is copied as output
-        return (h, c), h
+        i = nn.sigmoid(i)
+        o = nn.sigmoid(o)
+        f = nn.sigmoid(f)
+        g = nn.tanh(g)
+
+        c_new = f * c_prev + i * g
+        h_new = o * np.tanh(c_new)
+
+        return (h_new, c_new), h_new
 
     @jit
     def __call__(self, sequence_embedding: Tensor) -> Tensor:
@@ -151,14 +129,9 @@ class LSTM(Layer):
 
     def trainable_params(self) -> Dict[str, Any]:
         return {
-            "Wf": self.Wf,
-            "bf": self.bf,
-            "Wi": self.Wi,
-            "bi": self.bi,
-            "Wc": self.Wc,
-            "bc": self.bc,
-            "Wo": self.Wo,
-            "bo": self.bo,
+            "U": self.U,
+            "V": self.V,
+            "b": self.b,
             "c_prev": self.c_prev,
             "h_prev": self.h_prev,
         }
@@ -175,14 +148,9 @@ class FrozenLSTM(LSTM):
 
     def static_params(self) -> Dict[str, Any]:
         return {
-            "Wf": self.Wf,
-            "bf": self.bf,
-            "Wi": self.Wi,
-            "bi": self.bi,
-            "Wc": self.Wc,
-            "bc": self.bc,
-            "Wo": self.Wo,
-            "bo": self.bo,
+            "U": self.U,
+            "V": self.V,
+            "b": self.b,
             "c_prev": self.c_prev,
             "h_prev": self.h_prev,
         }

@@ -155,4 +155,38 @@ class LSTMSequenceTagger(LSTMClassifier):
         return vmap(self.predict)(batched_sequence_ids)
 
 
+class LSTMLanguageModel(Model):
+    """Language model with weight tying of embedding and output layer"""
+
+    lstm: LSTM
+    output_layer: Linear
+    output_dim: int
+
+    @classmethod
+    def initialize(
+        cls, vocab_size: int, hidden_dim: int, rng: RNG
+    ) -> "LSTMLanguageModel":
+        rng, new_rng = rng.split()
+
+        lstm = LSTM.initialize(input_dim=hidden_dim, hidden_dim=hidden_dim, rng=new_rng)
+        
+        output_layer = Linear.initialize(
+            input_dim=hidden_dim, output_dim=vocab_size, rng=rng
+        )
+
+        return cls(lstm=lstm, output_layer=output_layer, output_dim=vocab_size)
+
+    @jit
+    def predict(self, sequence_ids: Tensor) -> Tensor:
+
+        sequence_embedding = self.output_layer.w.take(sequence_ids, axis=1).T
+        output_sequence = self.lstm(sequence_embedding)
+
+        return vmap(self.output_layer)(output_sequence)
+
+    @jit
+    def __call__(self, batched_sequence_ids: Tensor) -> Tensor:
+        return vmap(self.predict)(batched_sequence_ids)
+
+
 __all__ = ["LSTMClassifier", "BiLSTMClassifier", "LSTMSequenceTagger"]

@@ -33,7 +33,7 @@ setup(
     package_data={"lorax": ["py.typed"]},
     include_package_data=True,
     install_requires=requirements,
-    python_requires=">=3.7",
+    python_requires=">=3.9",
     zip_safe=False,
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",
