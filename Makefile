@@ -29,43 +29,43 @@ clean-test:
 
 ## check style with flake8, mypy, black
 lint: clean
-	pipenv run isort .
-	pipenv run black .
-	pipenv run flake8 . --exit-zero
-	pipenv run mypy src
+	poetry run isort .
+	poetry run black .
+	poetry run flake8 . --exit-zero
+	poetry run mypy src
 
 ## run tests with the default Python
 test: lint
-	pipenv run pytest -vv --cov=src
+	poetry run pytest -vv --cov=src
 
 ## check code coverage quickly with the default Python
 coverage: clean
-	pipenv run pytest  -vv --cov=src --cov-report html --cov-report term --cov-context=test
+	poetry run pytest  -vv --cov=src --cov-report html --cov-report term --cov-context=test
 	open -a "Firefox" htmlcov/index.html
 
 ## increment the patch version, and tag in git
 bumpversion-patch: clean
-	pipenv run bumpversion --verbose patch
+	poetry version patch
 
 ## increment the minor version, and tag in git
 bumpversion-minor: clean
-	pipenv run bumpversion --verbose minor
+	poetry version minor
 
 ## increment the major version, and tag in git
 bumpversion-major: clean
-	pipenv run bumpversion --verbose major
+	poetry version major
 
 ## builds source and wheel package
 dist: clean
-	pipenv run python setup.py sdist bdist_wheel
+	poetry run poetry build
 
-## install the package to the pipenv virtualenv
+## install the package to the poetry virtualenv
 install: clean
-	pipenv install
+	poetry install
 
-## install the package and all development dependencies to the pipenv virtualenv
+## install the package and all development dependencies to the poetry virtualenv
 install-dev: clean
-	pipenv install --dev
+	poetry install --dev
 
 ##############################################################################
 # Self Documenting Commands                                                  #

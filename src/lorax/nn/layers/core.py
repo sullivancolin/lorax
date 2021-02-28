@@ -1,8 +1,6 @@
 """
 """
-from abc import abstractmethod
 from enum import Enum
-from typing import Any, Dict
 
 import jax.numpy as np
 from jax import jit, random
@@ -13,6 +11,8 @@ from lorax.nn.initilizers import INITIALIZERS, InitializerEnum
 from lorax.rng import RNG
 from lorax.tensor import Tensor
 
+from lorax.parameter import Parameter
+
 
 class Mode(str, Enum):
     """Allowed values for Layers with different behaviors during training and inference."""
@@ -21,27 +21,19 @@ class Mode(str, Enum):
     eval = "eval"
 
 
-class Layer(Module, is_abstract=True):
-    """Abstract Class for Layers. Enforces subclasses to implement __call__"""
-
-    @abstractmethod
-    def __call__(self, inputs: Tensor) -> Tensor:
-        raise NotImplementedError
-
-
-class Linear(Layer):
+class Linear(Module):
     """Dense Linear Layer.
     Computes output = activation(np.dot(w, inputs) + b)"""
 
-    w: Tensor
-    b: Tensor
+    w: Parameter
+    b: Parameter
     activation: ActivationEnum = ActivationEnum.identity
 
     @jit
-    def __call__(self, inputs: Tensor) -> Tensor:
-        """outputs = activation(np.dot(w, inputs) + b) in single instance notation."""
+    def forward(self, inputs: Tensor) -> Tensor:
+        """outputs = self.activation(inputs * self.w + self.b)"""
 
-        return ACTIVATIONS[self.activation](np.dot(self.w, inputs) + self.b)
+        return ACTIVATIONS[self.activation](inputs @ self.w.value + self.b.value)
 
     @classmethod
     def initialize(
@@ -55,32 +47,15 @@ class Linear(Layer):
     ) -> "Linear":
         """Factory for new Linear from input and output dimensions"""
         return cls(
-            w=INITIALIZERS[initializer](rng.to_prng(), shape=(output_dim, input_dim)),
-            b=np.zeros(shape=(output_dim,)),
+            w=Parameter.from_tensor(
+                INITIALIZERS[initializer](rng.to_prng(), shape=(input_dim, output_dim))
+            ),
+            b=Parameter.from_tensor(np.zeros(shape=(output_dim,))),
             activation=activation,
         )
 
-    def trainable_params(self) -> Dict[str, Any]:
-        return {"w": self.w, "b": self.b}
 
-    def static_params(self) -> Dict[str, Any]:
-        return {"activation": self.activation}
-
-
-class FrozenLinear(Linear):
-    """Untrainable Linear Layer"""
-
-    def initialize(self, *args: Any, **kwargs: Any) -> None:
-        raise NotImplementedError
-
-    def trainable_params(self) -> Dict[str, Any]:
-        return {}
-
-    def static_params(self) -> Dict[str, Any]:
-        return {"w": self.w, "b": self.b, "activation": self.activation}
-
-
-class Dropout(Layer):
+class Dropout(Module):
     """Dropout Layer. If in train mode, keeps input activations at given probability rate,
     otherwise returns inputs directly"""
 
@@ -89,14 +64,14 @@ class Dropout(Layer):
     mode: Mode = Mode.train
 
     @jit
-    def __call__(self, inputs: Tensor) -> Tensor:
+    def forward(self, inputs: Tensor) -> Tensor:
         """If in train mode, keeps input activations at rate,
         otherwise returns directly"""
 
         if self.mode == Mode.eval:
             return inputs
         rng_key = self.rng.to_prng()
-        mask = random.bernoulli(rng_key, self.keep, inputs.shape)
+        mask = random.bernoulli(rng_key, self.keep, inputs.shape)  # type: ignore
         return np.where(mask, inputs / self.keep, 0)
 
     def to_eval(self) -> "Dropout":
@@ -104,9 +79,3 @@ class Dropout(Layer):
 
     def to_train(self) -> "Dropout":
         return Dropout(rng=self.rng.split(num=1)[0], keep=self.keep, mode=Mode.train)
-
-    def trainable_params(self) -> Dict[str, Any]:
-        return {}
-
-    def static_params(self) -> Dict[str, Any]:
-        return {"rng": self.rng, "keep": self.keep, "mode": self.mode}

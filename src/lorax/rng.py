@@ -3,12 +3,12 @@ from typing import Any, Dict, Tuple, Union
 import jax.numpy as np
 from jax import random
 from numpy import ndarray
-
-from lorax.module import Module
+from pydantic import BaseModel
 from lorax.tensor import Tensor
+from jax.tree_util import register_pytree_node
 
 
-class RNG(Module):
+class RNG(BaseModel):
     int_1: int
     int_2: int
 
@@ -43,8 +43,13 @@ class RNG(Module):
     def __hash__(self) -> int:
         return hash((self.int_1, self.int_2))
 
-    def static_params(self) -> Dict[str, Any]:
-        return {"int_1": self.int_1, "int_2": self.int_2}
 
-    def trainable_params(self) -> Dict[str, Any]:
-        return {}
+def _flatten_rng(rng: RNG) -> Tuple[Tuple[int, int], None]:
+    return (rng.int_1, rng.int_2), None
+
+
+def _unflatten_rng(aux: Any, params: Tuple[int, int]) -> RNG:
+    return RNG.construct(int_1=params[0], int_2=params[1])
+
+
+register_pytree_node(RNG, _flatten_rng, _unflatten_rng)

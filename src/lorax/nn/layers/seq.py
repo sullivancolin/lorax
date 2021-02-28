@@ -1,21 +1,22 @@
-from typing import Any, Dict, Tuple
+from typing import Tuple
 
 import jax.numpy as np
 from jax import jit, lax, nn, ops
 
 from lorax.nn.initilizers import INITIALIZERS, InitializerEnum
-from lorax.nn.layers.core import Layer
+from lorax.module import Module
 from lorax.rng import RNG
+from lorax.parameter import Parameter
 from lorax.tensor import Tensor
 
 
-class Embedding(Layer):
+class Embedding(Module):
 
-    embedding_matrix: Tensor
+    embedding_matrix: Parameter
 
     @jit
-    def __call__(self, sequence_ids: Tensor) -> Tensor:
-        return self.embedding_matrix[sequence_ids]
+    def forward(self, sequence_ids: Tensor) -> Tensor:
+        return self.embedding_matrix.value[sequence_ids]
 
     @classmethod
     def initialize(
@@ -25,40 +26,21 @@ class Embedding(Layer):
         rng: RNG,
         initializer: InitializerEnum = InitializerEnum.normal,
     ) -> "Embedding":
-        vectors = INITIALIZERS[initializer](
-            rng.to_prng(), shape=(vocab_size, hidden_dim)
+        vectors = Parameter.from_tensor(
+            INITIALIZERS[initializer](rng.to_prng(), shape=(vocab_size, hidden_dim))
         )
-        vectors = ops.index_update(vectors, ops.index[0, :], 0.0)
+        vectors = ops.index_update(vectors.value, ops.index[0, :], 0.0)
         return cls(embedding_matrix=vectors)
 
-    def trainable_params(self) -> Dict[str, Any]:
-        return {"embedding_matrix": self.embedding_matrix}
 
-    def static_params(self) -> Dict[str, Any]:
-        return {}
+class LSTM(Module):
 
+    U: Parameter
+    V: Parameter
+    b: Parameter
 
-class FrozenEmbedding(Embedding):
-    """Untrainable Embedding Layer for pretrained embedding"""
-
-    def initialize(self, *args: Any, **kwargs: Any) -> None:
-        raise NotImplementedError
-
-    def static_params(self) -> Dict[str, Any]:
-        return {"embedding_matrix": self.embedding_matrix}
-
-    def trainable_params(self) -> Dict[str, Any]:
-        return {}
-
-
-class LSTM(Layer):
-
-    U: Tensor
-    V: Tensor
-    b: Tensor
-
-    h_prev: Tensor
-    c_prev: Tensor
+    h_prev: Parameter
+    c_prev: Parameter
 
     @classmethod
     def initialize(cls, input_dim: int, hidden_dim: int, rng: RNG) -> "LSTM":
@@ -81,7 +63,13 @@ class LSTM(Layer):
         h_prev = np.zeros(shape=(hidden_dim,))
         c_prev = np.zeros(shape=(hidden_dim,))
 
-        return cls(U=U, V=V, b=b, h_prev=h_prev, c_prev=c_prev)
+        return cls(
+            U=Parameter.from_tensor(U),
+            V=Parameter.from_tensor(V),
+            b=Parameter.from_tensor(U),
+            h_prev=Parameter.from_tensor(h_prev),
+            c_prev=Parameter.from_tensor(c_prev),
+        )
 
     @jit
     def time_step(
@@ -90,14 +78,14 @@ class LSTM(Layer):
 
         h_prev, c_prev = state
 
-        igof = self.U @ embedding + self.V @ h_prev + self.b
+        igof = self.U.value @ embedding + self.V.value @ h_prev + self.b.value
 
         i, g, o, f = np.split(igof, 4, axis=1)
 
         i = nn.sigmoid(i)
         o = nn.sigmoid(o)
         f = nn.sigmoid(f)
-        g = nn.tanh(g)
+        g = np.tanh(g)
 
         c_new = f * c_prev + i * g
         h_new = o * np.tanh(c_new)
@@ -105,9 +93,9 @@ class LSTM(Layer):
         return (h_new, c_new), h_new
 
     @jit
-    def __call__(self, sequence_embedding: Tensor) -> Tensor:
-        h_prev = self.h_prev
-        c_prev = self.c_prev
+    def forward(self, sequence_embedding: Tensor) -> Tensor:
+        h_prev = self.h_prev.value
+        c_prev = self.c_prev.value
 
         @jit
         def wrapped_time_step(
@@ -127,39 +115,8 @@ class LSTM(Layer):
 
         return output_sequence
 
-    def trainable_params(self) -> Dict[str, Any]:
-        return {
-            "U": self.U,
-            "V": self.V,
-            "b": self.b,
-            "c_prev": self.c_prev,
-            "h_prev": self.h_prev,
-        }
 
-    def static_params(self) -> Dict[str, Any]:
-        return {}
-
-
-class FrozenLSTM(LSTM):
-    """Untrainable LSTM pretrained layer"""
-
-    def initialize(self, *args: Any, **kwargs: Any) -> None:
-        raise NotImplementedError
-
-    def static_params(self) -> Dict[str, Any]:
-        return {
-            "U": self.U,
-            "V": self.V,
-            "b": self.b,
-            "c_prev": self.c_prev,
-            "h_prev": self.h_prev,
-        }
-
-    def trainable_params(self) -> Dict[str, Any]:
-        return {}
-
-
-class BiLSTM(Layer):
+class BiLSTM(Module):
 
     forward_lstm: LSTM
     backward_lstm: LSTM
@@ -169,16 +126,21 @@ class BiLSTM(Layer):
 
         rng_1, rng_2 = rng.split()
         forward_lstm = LSTM.initialize(
-            input_dim=input_dim, hidden_dim=hidden_dim, rng=rng_1,
+            input_dim=input_dim,
+            hidden_dim=hidden_dim,
+            rng=rng_1,
         )
         backward_lstm = LSTM.initialize(
             input_dim=input_dim, hidden_dim=hidden_dim, rng=rng_2
         )
 
-        return cls(forward_lstm=forward_lstm, backward_lstm=backward_lstm,)
+        return cls(
+            forward_lstm=forward_lstm,
+            backward_lstm=backward_lstm,
+        )
 
     @jit
-    def __call__(self, sequence_embedding: Tensor) -> Tensor:
+    def forward(self, sequence_embedding: Tensor) -> Tensor:
 
         forward_output_sequence = self.forward_lstm(sequence_embedding)
 
@@ -189,12 +151,3 @@ class BiLSTM(Layer):
         output = np.hstack((forward_output_sequence, backward_output_sequence))
 
         return output
-
-    def trainable_params(self) -> Dict[str, Any]:
-        return {
-            "forward_lstm": self.forward_lstm,
-            "backward_lstm": self.backward_lstm,
-        }
-
-    def static_params(self) -> Dict[str, Any]:
-        return {}
