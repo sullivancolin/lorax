@@ -11,7 +11,7 @@ from jax import jit, nn
 from jax.interpreters.xla import DeviceArray
 from jax.tree_util import tree_flatten
 
-from lorax.nn.layers import Layer
+from lorax.module import Module
 from lorax.tensor import Tensor
 
 suffix = ".pkl"
@@ -31,7 +31,7 @@ def flatten_layer_names(d: Dict[str, Any]) -> List[str]:
     return keys
 
 
-class Model(Layer, is_abstract=True):
+class Model(Module, is_abstract=True):
     output_dim: int
     input_dim: int
 

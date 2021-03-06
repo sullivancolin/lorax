@@ -3,10 +3,10 @@ import json
 from typing import Iterator, Tuple
 
 import numpy as onp
+import wandb
 from tokenizers import Tokenizer
 from tqdm.autonotebook import tqdm
 
-import wandb
 from lorax.tensor import Tensor
 from lorax.train import Experiment, wandb_notes
 
@@ -73,7 +73,6 @@ class LabeledCorpus:
 #             )
 
 #             yield Batch(padded_inputs, batch_targets)
-
 
 
 train_file = "imdb_train.txt.gz"

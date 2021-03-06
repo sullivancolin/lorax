@@ -169,7 +169,7 @@ class LSTMLanguageModel(Model):
         rng, new_rng = rng.split()
 
         lstm = LSTM.initialize(input_dim=hidden_dim, hidden_dim=hidden_dim, rng=new_rng)
-        
+
         output_layer = Linear.initialize(
             input_dim=hidden_dim, output_dim=vocab_size, rng=rng
         )

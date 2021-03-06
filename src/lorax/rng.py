@@ -2,10 +2,11 @@ from typing import Any, Dict, Tuple, Union
 
 import jax.numpy as np
 from jax import random
+from jax.tree_util import register_pytree_node
 from numpy import ndarray
 from pydantic import BaseModel
+
 from lorax.tensor import Tensor
-from jax.tree_util import register_pytree_node
 
 
 class RNG(BaseModel):

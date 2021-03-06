@@ -4,13 +4,13 @@ MNIST DNN classifier
 import json
 
 import jax.numpy as np
+import wandb
 from sklearn.datasets import fetch_openml
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelBinarizer, StandardScaler
 from sklearn.utils import check_random_state
 from tqdm.autonotebook import tqdm
 
-import wandb
 from lorax.metrics import accuracy
 from lorax.train import Experiment, wandb_notes
 
@@ -52,7 +52,10 @@ y = y[permutation]
 
 X = X.reshape((X.shape[0], -1))
 
-X_train, X_test, y_train, y_test = train_test_split(X, y,)
+X_train, X_test, y_train, y_test = train_test_split(
+    X,
+    y,
+)
 
 scaler = StandardScaler()
 X_train = scaler.fit_transform(X_train)

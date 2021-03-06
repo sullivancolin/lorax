@@ -1,12 +1,12 @@
 import json
 from collections import Counter
-from typing import Any, Dict, Iterator, Optional, Tuple, Union, List
+from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 
 import jax.numpy as np
+import wandb
 from jax.tree_util import tree_flatten
 from pydantic import BaseModel
 
-import wandb
 from lorax.config import (
     BiLSTMClassifierConfig,
     LSTMClassifierConfig,
@@ -64,12 +64,14 @@ def log_grads(grads: Model, step: int) -> None:
                 counts[name] -= 1
                 name = f"{name}_{incrementer[name]}"
             wandb_log(
-                {f"grad/{name}": wandb.Histogram(weights)}, step=step,
+                {f"grad/{name}": wandb.Histogram(weights)},
+                step=step,
             )
     else:
         for weights, name in zip(params, layer_names):
             wandb_log(
-                {f"grad/{name}": wandb.Histogram(weights)}, step=step,
+                {f"grad/{name}": wandb.Histogram(weights)},
+                step=step,
             )
 
 
@@ -87,12 +89,14 @@ def log_params(model: Model, step: int) -> None:
                 counts[name] -= 1
                 name = f"{name}_{incrementer[name]}"
             wandb_log(
-                {f"params/{name}": wandb.Histogram(weights)}, step=step,
+                {f"params/{name}": wandb.Histogram(weights)},
+                step=step,
             )
     else:
         for weights, name in zip(params, layer_names):
             wandb_log(
-                {f"params/{name}": wandb.Histogram(weights)}, step=step,
+                {f"params/{name}": wandb.Histogram(weights)},
+                step=step,
             )
 
 

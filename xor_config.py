@@ -5,9 +5,9 @@ learned with a simple linear model is XOR
 import json
 
 import jax.numpy as np
+import wandb
 from tqdm.autonotebook import tqdm
 
-import wandb
 from lorax.metrics import accuracy
 from lorax.train import Experiment, wandb_log, wandb_notes
 

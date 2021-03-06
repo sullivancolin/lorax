@@ -2,44 +2,31 @@
 """
 from typing import Any, Dict, List
 
-from jax import jit, vmap
+from jax import jit
 
-from lorax.models import Model
-from lorax.nn.layers import (
-    ActivationEnum,
-    Dropout,
-    InitializerEnum,
-    Layer,
-    Linear,
-    Mode,
-)
+from lorax.module import Module
+from lorax.nn.layers import ActivationEnum, Dropout, InitializerEnum, Linear, Mode
 from lorax.rng import RNG
 from lorax.tensor import Tensor
 
 
-class MLP(Model):
+class MLP(Module):
     """Class for deep feed forward models like Multilayer Perceptrons."""
 
-    layers: List[Layer]
+    layers: List[Module]
     input_dim: int
     output_dim: int
 
     @jit
-    def predict(self, single_input: Tensor) -> Tensor:
+    def forward(self, single_input: Tensor) -> Tensor:
         """Predict for a single instance by iterating over all the layers."""
 
         for layer in self.layers:
             single_input = layer(single_input)
         return single_input
 
-    @jit
-    def __call__(self, batched_inputs: Tensor) -> Tensor:
-        """Batched Predictions"""
-
-        return vmap(self.predict)(batched_inputs)
-
     def _set_mode(self, mode: Mode = Mode.train) -> "MLP":
-        new_layers: List[Layer] = []
+        new_layers: List[Module] = []
         for layer in self.layers:
             if isinstance(layer, Dropout):
                 if mode == "train":
@@ -73,7 +60,7 @@ class MLP(Model):
     ) -> "MLP":
 
         sizes = [input_dim] + hidden_sizes
-        layers: List[Layer] = []
+        layers: List[Module] = []
 
         for in_dim, hidden_dim in zip(sizes, sizes[1:]):
             rng, new_rng = rng.split()

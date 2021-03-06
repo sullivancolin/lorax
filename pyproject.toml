@@ -11,7 +11,7 @@ jax = "^0.2.9"
 jaxlib = "^0.1.59"
 numpy = "^1.20.0"
 tqdm = "^4.56.0"
-pydantic = "^1.7.3"
+pydantic = "~1.7.3"
 tokenizers = "^0.10.0"
 wandb = "^0.10.15"
 

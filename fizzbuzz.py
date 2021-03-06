@@ -11,9 +11,9 @@ import json
 from typing import List
 
 import jax.numpy as np
+import wandb
 from tqdm.autonotebook import tqdm
 
-import wandb
 from lorax.metrics import accuracy
 from lorax.train import Experiment, wandb_log, wandb_notes
 

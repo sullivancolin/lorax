@@ -1,6 +1,8 @@
-from pydantic import BaseModel
+from typing import Any, Dict, Sequence, Tuple
+
 from jax.tree_util import register_pytree_node
-from typing import Any, Sequence, Dict, Tuple
+from pydantic import BaseModel
+
 from lorax.tensor import Tensor
 
 

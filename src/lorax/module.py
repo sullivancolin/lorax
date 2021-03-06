@@ -2,26 +2,20 @@
 Abstract Module class with automatic Pytree registration
 Inspired by from https://github.com/google/jax/issues/2916
 """
-from abc import ABC, abstractmethod
-from typing import (
-    Any,
-    Dict,
-    List,
-    Tuple,
-    Type,
-    TypeVar,
-    Union,
-)
+from __future__ import annotations
 import pickle
+from abc import ABC, abstractmethod
 from pathlib import Path
-from lorax.parameter import Parameter
-from lorax.tensor import Tensor
+from typing import Any, Dict, Iterator, List, Optional, Set, Tuple, Type, TypeVar, Union
 
 import jax.numpy as np
+from jax import jit
 from jax.tree_util import register_pytree_node
 from numpy import ndarray
 from pydantic import BaseModel
-from jax import jit
+
+from lorax.parameter import Parameter
+from lorax.tensor import Tensor
 
 __all__ = ["Module"]
 
@@ -33,6 +27,7 @@ suffix = ".pkl"
 class Module(BaseModel, ABC):
     class Config:
         allow_mutation = False
+        # frozen = True
         json_encoders = {
             np.DeviceArray: lambda t: f"shape={t.shape}",
             ndarray: lambda a: f"shape={a.shape}",
@@ -43,22 +38,24 @@ class Module(BaseModel, ABC):
         if not is_abstract:
             register_pytree_node(cls, cls._tree_flatten, cls._tree_unflatten)
 
-    def __new__(cls, *args: Any, **kwargs: Any) -> "Module":
+    def __new__(cls, *args: Any, **kwargs: Any) -> Module:
         cls._params = [
             field
             for field, kind in cls.__fields__.items()
-            if issubclass(kind.type_, Parameter)
+            if kind.name != "__root__" and issubclass(kind.type_, Parameter)
         ]
 
         cls._children = [
             field
             for field, kind in cls.__fields__.items()
-            if issubclass(kind.type_, Module)
+            if kind.name == "__root__" or issubclass(kind.type_, Module)
         ]
         cls._static = [
             field
             for field in cls.__fields__.keys()
-            if field not in cls._params and field not in cls._children
+            if field != "__root__"
+            and field not in cls._params
+            and field not in cls._children
         ]
         return super().__new__(cls)
 
@@ -77,9 +74,12 @@ class Module(BaseModel, ABC):
     def __str__(self) -> str:
         return self.json()
 
+    def __hash__(self) -> int:
+        return id(self)
+
     def _tree_flatten(
         self,
-    ) -> "Tuple[List[Union[Parameter, Module]], Tuple[List[str], List[Any]]]":
+    ) -> Tuple[List[Union[Parameter, Module]], Tuple[List[str], List[Any]]]:
         children = [getattr(self, val) for val in self._params]
 
         children += [getattr(self, val) for val in self._children]
@@ -91,7 +91,7 @@ class Module(BaseModel, ABC):
 
     @classmethod
     def _tree_unflatten(
-        cls, aux: Tuple[List[str], List[Any]], params: "List[Union[Parameter, Module]]"
+        cls, aux: Tuple[List[str], List[Any]], params: List[Union[Parameter, Module]]
     ) -> "Module":
         keys = aux[0]
         vals = list(params) + aux[1]
@@ -105,6 +105,36 @@ class Module(BaseModel, ABC):
     @jit
     def __call__(self, inputs: Tensor) -> Tensor:
         return self.forward(inputs)
+
+    def children(self) -> Iterator[Module]:
+        for _, module in self.named_children():
+            yield module
+
+    def named_children(self) -> Iterator[Tuple[str, Module]]:
+        for name in self._children:
+            module = getattr(self, name)
+            yield name, module
+
+    def modules(self) -> Iterator["Module"]:
+        for _, module in self.named_modules():
+            yield module
+
+    def named_modules(
+        self, memo: Optional[Set["Module"]] = None, prefix: str = ""
+    ) -> Iterator[Tuple[str, "Module"]]:
+
+        if memo is None:
+            memo = set()
+        if self not in memo:
+            memo.add(self)
+            yield prefix, self
+            for name in self._children:
+                module = getattr(self, name)
+                if module is None:
+                    continue
+                submodule_prefix = prefix + ("." if prefix else "") + name
+                for m in module.named_modules(memo, submodule_prefix):
+                    yield m
 
     def save(self, path: Union[str, Path], overwrite: bool = False) -> None:
         path = Path(path)

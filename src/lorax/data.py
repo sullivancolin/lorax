@@ -10,7 +10,6 @@ from jax import random
 from lorax.rng import RNG
 from lorax.tensor import Tensor
 
-
 Encoder = Callable[[Any, Any], Tuple[Tensor, Tensor]]
 
 
