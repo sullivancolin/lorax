@@ -1,20 +1,20 @@
 from lorax.nn.functional.activations import (
     ACTIVATIONS,
     ActivationEnum,
-    selu,
-    relu,
+    identity,
     leaky_relu,
     mish,
+    relu,
+    selu,
+    sigmoid,
     softmax,
     softplus,
-    identity,
-    sigmoid,
     tanh,
 )
 from lorax.nn.functional.initilizers import (
     INITIALIZERS,
     InitializerEnum,
-    normal,
     glorot_normal,
     lecun_normal,
+    normal,
 )

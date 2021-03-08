@@ -3,8 +3,8 @@
 from typing import Any, Dict, List
 
 from lorax import nn
-from lorax.nn.layers import Dropout, Linear
 from lorax.nn.functional import ActivationEnum, InitializerEnum
+from lorax.nn.layers import Dropout, Linear
 from lorax.rng import RNG
 
 

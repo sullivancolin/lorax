@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Iterator, Tuple, Dict, Any
+from typing import Any, Dict, Iterator, Tuple
 
 import jax.numpy as np
 from jax import jit, random
@@ -11,8 +11,8 @@ from jax import jit, random
 from lorax.nn import Module
 from lorax.nn.functional import (
     ACTIVATIONS,
-    ActivationEnum,
     INITIALIZERS,
+    ActivationEnum,
     InitializerEnum,
 )
 from lorax.parameter import Parameter

@@ -1,8 +1,9 @@
 from enum import Enum
 
-from lorax.tensor import Tensor
+from jax.nn import leaky_relu, relu, selu, sigmoid, softmax, softplus
 from jax.numpy import tanh
-from jax.nn import softmax, sigmoid, selu, leaky_relu, relu, softplus
+
+from lorax.tensor import Tensor
 
 
 def mish(x: Tensor) -> Tensor:

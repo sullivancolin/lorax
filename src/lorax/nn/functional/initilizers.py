@@ -1,6 +1,6 @@
 from enum import Enum
 
-from jax.nn.initializers import normal, glorot_normal, lecun_normal
+from jax.nn.initializers import glorot_normal, lecun_normal, normal
 
 INITIALIZERS = {
     "normal": normal(stddev=1.0),
