@@ -3,8 +3,8 @@ from typing import Tuple
 import jax.numpy as np
 from jax import jit, lax, nn, ops
 
-from lorax.module import Module
-from lorax.nn.initilizers import INITIALIZERS, InitializerEnum
+from lorax.nn import Module
+from lorax.nn.functional import INITIALIZERS, InitializerEnum
 from lorax.parameter import Parameter
 from lorax.rng import RNG
 from lorax.tensor import Tensor

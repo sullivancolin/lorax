@@ -1,15 +1,20 @@
 """
 """
 from __future__ import annotations
+
 from enum import Enum
-from typing import Iterator, Tuple, Optional, Set
+from typing import Iterator, Tuple, Dict, Any
 
 import jax.numpy as np
 from jax import jit, random
 
-from lorax.module import Module
-from lorax.nn.activations import ACTIVATIONS, ActivationEnum
-from lorax.nn.initilizers import INITIALIZERS, InitializerEnum
+from lorax.nn import Module
+from lorax.nn.functional import (
+    ACTIVATIONS,
+    ActivationEnum,
+    INITIALIZERS,
+    InitializerEnum,
+)
 from lorax.parameter import Parameter
 from lorax.rng import RNG
 from lorax.tensor import Tensor
@@ -24,7 +29,7 @@ class Mode(str, Enum):
 
 class Linear(Module):
     """Dense Linear Layer.
-    Computes output = activation(np.dot(w, inputs) + b)"""
+    Computes output = activation(inputs @ w + b)"""
 
     w: Parameter
     b: Parameter
@@ -101,22 +106,17 @@ class Sequential(Module):
     def build(cls, *args: Module) -> Sequential:
         return Sequential(__root__=args)
 
-    def named_modules(
-        self, memo: Optional[Set["Module"]] = None, prefix: str = ""
-    ) -> Iterator[Tuple[str, "Module"]]:
+    def new_state(self, rng: Tensor, mode: str = "train") -> Module:
+        d: Dict[str, Any] = {"mode": mode}
+        rngs = random.split(rng, len(self.__root__))
 
-        if memo is None:
-            memo = set()
-        if self not in memo:
-            memo.add(self)
-            yield prefix, self
-            for index, module in enumerate(self.__root__):
-                if module is None:
-                    continue
-                submodule_prefix = prefix + ("." if prefix else "") + str(index)
-                for m in module.named_modules(memo, submodule_prefix):
-                    yield m
+        new_tup = tuple(
+            mod.new_state(rng, mode) for rng, mod in zip(rngs, self.__root__)
+        )
+        d["__root__"] = new_tup
+        return self.copy(update=d)
 
+    @jit
     def forward(self, inputs: Tensor) -> Tensor:
         for module in self:
             inputs = module(inputs)

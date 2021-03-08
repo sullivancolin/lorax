@@ -6,19 +6,18 @@ from typing import Any, Dict, Type, TypeVar
 
 from jax import jit, vmap
 
-from lorax.models import Model
-from lorax.nn.layers import LSTM, ActivationEnum, BiLSTM, Embedding, Linear
+from lorax import nn
 from lorax.rng import RNG
 from lorax.tensor import Tensor
 
 T = TypeVar("T", bound="LSTMClassifier")
 
 
-class LSTMClassifier(Model):
+class LSTMClassifier(nn.Module):
 
-    embeddings: Embedding
-    lstm: LSTM
-    output_layer: Linear
+    embeddings: nn.Embedding
+    lstm: nn.LSTM
+    output_layer: nn.Linear
     output_dim: int
 
     @classmethod
@@ -33,18 +32,18 @@ class LSTMClassifier(Model):
         **kwargs: Dict[str, Any]
     ) -> T:
         rng, new_rng = rng.split()
-        embedding = Embedding.initialize(vocab_size, embedding_dim, new_rng)
+        embedding = nn.Embedding.initialize(vocab_size, embedding_dim, new_rng)
 
         rng, new_rng = rng.split()
-        lstm = LSTM.initialize(
+        lstm = nn.LSTM.initialize(
             input_dim=embedding_dim, hidden_dim=hidden_dim, rng=new_rng
         )
 
         rng, new_rng = rng.split()
-        output_layer = Linear.initialize(
+        output_layer = nn.Linear.initialize(
             input_dim=hidden_dim,
             output_dim=output_dim,
-            activation=ActivationEnum.identity,
+            activation=nn.functional.ActivationEnum.identity,
             rng=new_rng,
         )
         return cls(
@@ -77,11 +76,11 @@ class LSTMClassifier(Model):
         return {"output_dim": self.output_dim}
 
 
-class BiLSTMClassifier(Model):
+class BiLSTMClassifier(nn.Module):
 
-    embeddings: Embedding
-    bilstm: BiLSTM
-    output_layer: Linear
+    embeddings: nn.Embedding
+    bilstm: nn.BiLSTM
+    output_layer: nn.Linear
     output_dim: int
 
     @classmethod
@@ -96,18 +95,18 @@ class BiLSTMClassifier(Model):
         **kwargs: Dict[str, Any]
     ) -> "BiLSTMClassifier":
         rng, new_rng = rng.split()
-        embedding = Embedding.initialize(vocab_size, embedding_dim, new_rng)
+        embedding = nn.Embedding.initialize(vocab_size, embedding_dim, new_rng)
 
         rng, new_rng = rng.split()
-        bilstm = BiLSTM.initialize(
+        bilstm = nn.BiLSTM.initialize(
             input_dim=embedding_dim, hidden_dim=hidden_dim, rng=new_rng
         )
 
         rng, new_rng = rng.split()
-        output_layer = Linear.initialize(
+        output_layer = nn.Linear.initialize(
             input_dim=hidden_dim * 2,
             output_dim=output_dim,
-            activation=ActivationEnum.identity,
+            activation=nn.functional.ActivationEnum.identity,
             rng=new_rng,
         )
 
@@ -155,11 +154,11 @@ class LSTMSequenceTagger(LSTMClassifier):
         return vmap(self.predict)(batched_sequence_ids)
 
 
-class LSTMLanguageModel(Model):
+class LSTMLanguageModel(nn.Module):
     """Language model with weight tying of embedding and output layer"""
 
-    lstm: LSTM
-    output_layer: Linear
+    lstm: nn.LSTM
+    output_layer: nn.Linear
     output_dim: int
 
     @classmethod
@@ -168,9 +167,11 @@ class LSTMLanguageModel(Model):
     ) -> "LSTMLanguageModel":
         rng, new_rng = rng.split()
 
-        lstm = LSTM.initialize(input_dim=hidden_dim, hidden_dim=hidden_dim, rng=new_rng)
+        lstm = nn.LSTM.initialize(
+            input_dim=hidden_dim, hidden_dim=hidden_dim, rng=new_rng
+        )
 
-        output_layer = Linear.initialize(
+        output_layer = nn.Linear.initialize(
             input_dim=hidden_dim, output_dim=vocab_size, rng=rng
         )
 
@@ -179,7 +180,7 @@ class LSTMLanguageModel(Model):
     @jit
     def predict(self, sequence_ids: Tensor) -> Tensor:
 
-        sequence_embedding = self.output_layer.w.take(sequence_ids, axis=1).T
+        sequence_embedding = self.output_layer.w.value.take(sequence_ids, axis=1).T
         output_sequence = self.lstm(sequence_embedding)
 
         return vmap(self.output_layer)(output_sequence)

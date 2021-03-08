@@ -3,16 +3,18 @@ Abstract Module class with automatic Pytree registration
 Inspired by from https://github.com/google/jax/issues/2916
 """
 from __future__ import annotations
+
 import pickle
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional, Set, Tuple, Type, TypeVar, Union
+from typing import Any, Dict, List, Tuple, Type, TypeVar, Union
 
 import jax.numpy as np
-from jax import jit
+from jax import jit, random
 from jax.tree_util import register_pytree_node
 from numpy import ndarray
 from pydantic import BaseModel
+from pydantic.utils import deep_update
 
 from lorax.parameter import Parameter
 from lorax.tensor import Tensor
@@ -27,7 +29,6 @@ suffix = ".pkl"
 class Module(BaseModel, ABC):
     class Config:
         allow_mutation = False
-        # frozen = True
         json_encoders = {
             np.DeviceArray: lambda t: f"shape={t.shape}",
             ndarray: lambda a: f"shape={a.shape}",
@@ -106,35 +107,18 @@ class Module(BaseModel, ABC):
     def __call__(self, inputs: Tensor) -> Tensor:
         return self.forward(inputs)
 
-    def children(self) -> Iterator[Module]:
-        for _, module in self.named_children():
-            yield module
+    def update(self, update_dict: Dict[str, Any]) -> Module:
+        new_dict = deep_update(self.dict(), update_dict)
+        return self.__class__(**new_dict)
 
-    def named_children(self) -> Iterator[Tuple[str, Module]]:
-        for name in self._children:
-            module = getattr(self, name)
-            yield name, module
+    def new_state(self, rng: Tensor, mode: str = "train") -> Module:
+        d = {"mode": mode}
+        rngs = random.split(rng, len(self._children))
 
-    def modules(self) -> Iterator["Module"]:
-        for _, module in self.named_modules():
-            yield module
-
-    def named_modules(
-        self, memo: Optional[Set["Module"]] = None, prefix: str = ""
-    ) -> Iterator[Tuple[str, "Module"]]:
-
-        if memo is None:
-            memo = set()
-        if self not in memo:
-            memo.add(self)
-            yield prefix, self
-            for name in self._children:
-                module = getattr(self, name)
-                if module is None:
-                    continue
-                submodule_prefix = prefix + ("." if prefix else "") + name
-                for m in module.named_modules(memo, submodule_prefix):
-                    yield m
+        for m, rng in zip(self._children, rngs):
+            new_m = getattr(self, m).new_state(rng, mode)
+            d[m] = new_m
+        return self.update(d)
 
     def save(self, path: Union[str, Path], overwrite: bool = False) -> None:
         path = Path(path)
