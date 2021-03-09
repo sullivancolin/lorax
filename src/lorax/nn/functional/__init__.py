@@ -3,6 +3,7 @@ from lorax.nn.functional.activations import (
     ActivationEnum,
     identity,
     leaky_relu,
+    log_softmax,
     mish,
     relu,
     selu,
@@ -11,10 +12,10 @@ from lorax.nn.functional.activations import (
     softplus,
     tanh,
 )
-from lorax.nn.functional.initilizers import (
+from lorax.nn.functional.initializers import (
     INITIALIZERS,
     InitializerEnum,
-    glorot_normal,
     lecun_normal,
     normal,
+    xavier_normal,
 )

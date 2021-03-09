@@ -1,12 +1,13 @@
+from __future__ import annotations
+
 from typing import Tuple
 
 import jax.numpy as np
 from jax import jit, lax, nn, ops
 
 from lorax.nn import Module
-from lorax.nn.functional import INITIALIZERS, InitializerEnum
-from lorax.parameter import Parameter
-from lorax.rng import RNG
+from lorax.nn.functional import InitializerEnum
+from lorax.parameter import Parameter, ParamInit
 from lorax.tensor import Tensor
 
 
@@ -16,21 +17,23 @@ class Embedding(Module):
 
     @jit
     def forward(self, sequence_ids: Tensor) -> Tensor:
-        return self.embedding_matrix.value[sequence_ids]
+        return self.embedding_matrix[sequence_ids]
 
     @classmethod
-    def initialize(
+    def build(
         cls,
         vocab_size: int,
         hidden_dim: int,
-        rng: RNG,
         initializer: InitializerEnum = InitializerEnum.normal,
     ) -> "Embedding":
-        vectors = Parameter.from_tensor(
-            INITIALIZERS[initializer](rng.to_prng(), shape=(vocab_size, hidden_dim))
-        )
-        vectors = ops.index_update(vectors.value, ops.index[0, :], 0.0)
+        vectors = ParamInit(shape=(vocab_size, hidden_dim))
         return cls(embedding_matrix=vectors)
+
+    def initialize(self, rng: Tensor) -> Embedding:
+        embedding = super().initialize(rng)
+        vectors = embedding.embedding_matrix
+        vectors = ops.index_update(vectors, ops.index[0, :], 0.0)
+        return self.update(embedding_matrix=vectors)
 
 
 class LSTM(Module):
@@ -43,15 +46,15 @@ class LSTM(Module):
     c_prev: Parameter
 
     @classmethod
-    def initialize(cls, input_dim: int, hidden_dim: int, rng: RNG) -> "LSTM":
-        U_rng, V_rng = rng.split()
+    def build(cls, input_dim: int, hidden_dim: int) -> "LSTM":
 
-        U = nn.initializers.glorot_normal()(
-            U_rng.to_prng(), shape=(4 * hidden_dim, input_dim)
+        U = ParamInit(
+            shape=(4 * hidden_dim, input_dim), initializer=InitializerEnum.xavier_normal
         )
 
-        V = nn.initializers.glorot_normal()(
-            V_rng.to_prng(), shape=(4 * hidden_dim, hidden_dim)
+        V = ParamInit(
+            shape=(4 * hidden_dim, hidden_dim),
+            initializer=InitializerEnum.xavier_normal,
         )
 
         # Forget bias is ones instead of zeros to start
@@ -64,11 +67,11 @@ class LSTM(Module):
         c_prev = np.zeros(shape=(hidden_dim,))
 
         return cls(
-            U=Parameter.from_tensor(U),
-            V=Parameter.from_tensor(V),
-            b=Parameter.from_tensor(U),
-            h_prev=Parameter.from_tensor(h_prev),
-            c_prev=Parameter.from_tensor(c_prev),
+            U=U,
+            V=V,
+            b=U,
+            h_prev=h_prev,
+            c_prev=c_prev,
         )
 
     @jit
@@ -78,7 +81,7 @@ class LSTM(Module):
 
         h_prev, c_prev = state
 
-        igof = self.U.value @ embedding + self.V.value @ h_prev + self.b.value
+        igof = self.U @ embedding + self.V @ h_prev + self.b
 
         i, g, o, f = np.split(igof, 4, axis=1)
 
@@ -94,8 +97,8 @@ class LSTM(Module):
 
     @jit
     def forward(self, sequence_embedding: Tensor) -> Tensor:
-        h_prev = self.h_prev.value
-        c_prev = self.c_prev.value
+        h_prev = self.h_prev
+        c_prev = self.c_prev
 
         @jit
         def wrapped_time_step(
@@ -122,17 +125,9 @@ class BiLSTM(Module):
     backward_lstm: LSTM
 
     @classmethod
-    def initialize(cls, *, input_dim: int, hidden_dim: int, rng: RNG) -> "BiLSTM":
-
-        rng_1, rng_2 = rng.split()
-        forward_lstm = LSTM.initialize(
-            input_dim=input_dim,
-            hidden_dim=hidden_dim,
-            rng=rng_1,
-        )
-        backward_lstm = LSTM.initialize(
-            input_dim=input_dim, hidden_dim=hidden_dim, rng=rng_2
-        )
+    def build(cls, *, input_dim: int, hidden_dim: int) -> "BiLSTM":
+        forward_lstm = LSTM.build(input_dim, hidden_dim)
+        backward_lstm = LSTM.build(input_dim, hidden_dim)
 
         return cls(
             forward_lstm=forward_lstm,

@@ -9,13 +9,14 @@ from enum import Enum
 from typing import Callable
 
 import jax.numpy as np
-from jax import jit, nn
+from jax import jit
 from jax.tree_util import tree_flatten
 
-from lorax.models import Model
+import lorax.nn.functional as F
+from lorax.nn import Module
 from lorax.tensor import Tensor
 
-Loss = Callable[[Model, Tensor, Tensor], float]
+Loss = Callable[[Module, Tensor, Tensor], float]
 
 
 class LossEnum(str, Enum):
@@ -30,63 +31,65 @@ class RegularizationEnum(str, Enum):
 
 
 @jit
-def l2(model: Model) -> float:
-    params, _ = tree_flatten(model)
+def l2(module: Module) -> float:
+    params, _ = tree_flatten(module)
     return np.sum([np.sum(layer ** 2) for layer in params]) / 2
 
 
-def l2_reguluarized(loss: Loss) -> Callable[[Model, Tensor, Tensor], float]:
+def l2_reguluarized(loss: Loss) -> Loss:
     @jit
     def wrapped(
-        model: Model, inputs: Tensor, targets: Tensor, gamma: float = 0.01
+        module: Module, inputs: Tensor, targets: Tensor, gamma: float = 0.01
     ) -> float:
-        return loss(model, inputs, targets) + l2(model) * gamma
+        return loss(module, inputs, targets) + l2(module) * gamma
 
     return wrapped
 
 
 @jit
-def l1(model: Model) -> float:
+def l1(model: Module) -> float:
     params, _ = tree_flatten(model)
     return np.sum([np.sum(np.abs(layer)) for layer in params])
 
 
-def l1_regularized(loss: Loss) -> Callable[[Model, Tensor, Tensor], float]:
+def l1_regularized(loss: Loss) -> Loss:
     @jit
     def wrapped(
-        model: Model, inputs: Tensor, targets: Tensor, gamma: float = 0.01
+        module: Module, inputs: Tensor, targets: Tensor, gamma: float = 0.01
     ) -> float:
-        return loss(model, inputs, targets) + l1(model) * gamma
+        return loss(module, inputs, targets) + l1(module) * gamma
 
     return wrapped
 
 
-def l1_l2_regularized(loss: Loss) -> Callable[[Model, Tensor, Tensor], float]:
+def l1_l2_regularized(loss: Loss) -> Loss:
     @jit
     def wrapped(
-        model: Model,
+        module: Module,
         inputs: Tensor,
         targets: Tensor,
         l1_gamma: float = 0.01,
         l2_gamma: float = 0.01,
     ) -> float:
         return (
-            loss(model, inputs, targets) + l1(model) * l1_gamma + l2(model) * l2_gamma
+            loss(module, inputs, targets)
+            + l1(module) * l1_gamma
+            + l2(module) * l2_gamma
         )
 
     return wrapped
 
 
 @jit
-def mean_squared_error(model: Model, inputs: Tensor, targets: Tensor) -> float:
-    predicted = model(inputs)
+def mean_squared_error(module: Module, inputs: Tensor, targets: Tensor) -> float:
+    predicted = module(inputs)
     return np.mean((predicted - targets) ** 2)
 
 
 @jit
-def cross_entropy(model: Model, inputs: Tensor, targets: Tensor) -> float:
+def cross_entropy(module: Module, inputs: Tensor, targets: Tensor) -> float:
     # log softmax
-    predicted = nn.log_softmax(model(inputs))
+    predicted = F.log_softmax(module(inputs))
 
     # negative log likelihood
     return -np.mean(np.sum(targets * predicted, axis=1))

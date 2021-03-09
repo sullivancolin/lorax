@@ -5,7 +5,6 @@ from numpy import testing
 
 from lorax.models import MLP
 from lorax.nn.layers import Dropout, Embedding
-from lorax.rng import RNG
 from lorax.tensor import Tensor
 
 
@@ -20,13 +19,14 @@ def batched_inputs(single_input: Tensor) -> Tensor:
 
 
 @pytest.fixture
-def rng() -> RNG:
-    return RNG.from_prng(random.PRNGKey(42))
+def rng() -> Tensor:
+    return random.PRNGKey(42)
 
 
 @pytest.fixture
-def dropout(rng: RNG) -> Dropout:
-    return Dropout(keep=0.5, mode="train", rng=rng)
+def dropout(rng: Tensor) -> Dropout:
+    d = Dropout(keep=0.5, mode="train")
+    return d.initialize(rng)
 
 
 def test_dropout(single_input: Tensor, dropout: Dropout) -> None:
@@ -50,7 +50,7 @@ def test_dropout(single_input: Tensor, dropout: Dropout) -> None:
 
 def test_mlp_dropout(batched_inputs: Tensor, dropout: Dropout) -> None:
 
-    simplenn = MLP(layers=[dropout], input_dim=2, output_dim=2)
+    simplenn = MLP.build(dropout)
 
     outputs = simplenn(batched_inputs)
 
@@ -74,7 +74,7 @@ def test_mlp_dropout(batched_inputs: Tensor, dropout: Dropout) -> None:
 
 
 @pytest.fixture
-def embedding(rng: RNG) -> Embedding:
+def embedding() -> Embedding:
     return Embedding(
         embedding_matrix=np.array(
             [[1.0, 1.0, 1.0, 1.0], [2.0, 2.0, 2.0, 2.0], [3.0, 3.0, 3.0, 3.0]]

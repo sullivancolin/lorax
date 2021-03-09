@@ -1,6 +1,6 @@
 from enum import Enum
 
-from jax.nn import leaky_relu, relu, selu, sigmoid, softmax, softplus
+from jax.nn import leaky_relu, log_softmax, relu, selu, sigmoid, softmax, softplus
 from jax.numpy import tanh
 
 from lorax.tensor import Tensor
@@ -23,6 +23,7 @@ class ActivationEnum(str, Enum):
     softmax = "softmax"
     mish = "mish"
     identity = "identity"
+    log_softmax = "log_softmax"
 
 
 ACTIVATIONS = {
@@ -34,4 +35,5 @@ ACTIVATIONS = {
     "softmax": softmax,
     "mish": mish,
     "identity": identity,
+    "log_softmax": log_softmax,
 }

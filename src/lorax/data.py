@@ -7,7 +7,6 @@ from typing import Any, Callable, Iterator, Sequence, Tuple
 import jax.numpy as np
 from jax import random
 
-from lorax.rng import RNG
 from lorax.tensor import Tensor
 
 Encoder = Callable[[Any, Any], Tuple[Tensor, Tensor]]
@@ -25,12 +24,12 @@ class DataIterator:
     targets: Sequence[Any]
     inputs: Sequence[Any]
     batch_size: int
-    rng: RNG
+    rng: Tensor
     encoder: Encoder = lambda x, y: (x, y)
 
     def __iter__(self) -> Iterator[Batch]:
         starts = np.arange(0, len(self.inputs), self.batch_size)
-        self.rng, new_rng = self.rng.split()
+        self.rng, new_rng = random.split(self.rng)
         starts = random.permutation(new_rng.to_prng(), starts)
 
         for start in starts:

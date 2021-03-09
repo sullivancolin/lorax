@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from enum import Enum
 from functools import partial
-from typing import Any, Callable, Optional, Tuple, Type, TypeVar
+from typing import Any, Callable, Dict, Optional, Tuple, Type, TypeVar
 
 from jax import jit, value_and_grad
 from jax.experimental.optimizers import adam
@@ -9,28 +9,28 @@ from jax.tree_util import tree_multimap
 from pydantic import BaseModel
 
 from lorax.loss import Loss
-from lorax.models import Model
+from lorax.nn import Module
 from lorax.tensor import Tensor
 
-LossGrad = Callable[[Model, Tensor, Tensor], Tuple[float, Model]]
+LossGrad = Callable[[Module, Tensor, Tensor], Tuple[float, Module]]
 
 T = TypeVar("T", bound="Optimizer")
 
 
 class Optimizer(BaseModel, ABC):
     loss: Loss
-    model: Model
-    grads: Optional[Model] = None
+    model: Module
+    grads: Optional[Module] = None
     value_grad_func: LossGrad
     learning_rate: float = 0.001
 
     @abstractmethod
-    def step(self, inputs: Tensor, targets: Tensor) -> Tuple[float, Model]:
+    def step(self, inputs: Tensor, targets: Tensor) -> Tuple[float, Module]:
         raise NotImplementedError
 
     @classmethod
     @abstractmethod
-    def initialize(cls: Type[T], net: Model, loss: Loss, lr: float = 0.01) -> T:
+    def initialize(cls: Type[T], net: Module, loss: Loss, lr: float = 0.01) -> T:
         raise NotImplementedError
 
 
@@ -42,7 +42,9 @@ def sgd_update_combiner(param: Tensor, grad: Tensor, lr: float) -> Tensor:
 
 class SGD(Optimizer):
     @classmethod
-    def initialize(cls, model: Model, loss: Loss, learning_rate: float = 0.01) -> "SGD":
+    def initialize(
+        cls, model: Module, loss: Loss, learning_rate: float = 0.01
+    ) -> "SGD":
         value_grad_func = jit(value_and_grad(loss))
 
         return cls(
@@ -52,13 +54,13 @@ class SGD(Optimizer):
             loss=loss,
         )
 
-    def step(self, inputs: Tensor, targets: Tensor) -> Tuple[float, Model]:
+    def step(self, inputs: Tensor, targets: Tensor) -> Tuple[float, Module]:
 
         loss, self.grads = self.value_grad_func(self.model, inputs, targets)
 
         combiner = partial(sgd_update_combiner, lr=self.learning_rate)
-        self.model = tree_multimap(combiner, self.model, self.grads)
-        return loss, self.model
+        self.module = tree_multimap(combiner, self.model, self.grads)
+        return loss, self.module
 
 
 class Adam(Optimizer):
@@ -70,7 +72,7 @@ class Adam(Optimizer):
 
     @classmethod
     def initialize(
-        cls, model: Model, loss: Loss, learning_rate: float = 0.01
+        cls, model: Module, loss: Loss, learning_rate: float = 0.01
     ) -> "Adam":
 
         value_grad_func: LossGrad = jit(value_and_grad(loss))
@@ -87,15 +89,15 @@ class Adam(Optimizer):
             loss=loss,
         )
 
-    def step(self, inputs: Tensor, targets: Tensor) -> Tuple[float, Model]:
-        self.model = self.get_params(self.opt_state)
-        loss, self.grads = self.value_grad_func(self.model, inputs, targets)
+    def step(self, inputs: Tensor, targets: Tensor) -> Tuple[float, Module]:
+        self.module = self.get_params(self.opt_state)
+        loss, self.grads = self.value_grad_func(self.module, inputs, targets)
         self.opt_state = self.update_func(self.update_count, self.grads, self.opt_state)
         self.update_count += 1
         return loss, self.get_params(self.opt_state)
 
 
-OPTIMIZERS = {"sgd": SGD, "adam": Adam}
+OPTIMIZERS: Dict[str, Type[Optimizer]] = {"sgd": SGD, "adam": Adam}
 
 
 class OptimizerEnum(str, Enum):

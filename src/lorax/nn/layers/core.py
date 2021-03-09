@@ -3,20 +3,16 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Dict, Iterator, Tuple
+from typing import Any, Dict, Iterator, Optional, Tuple
 
 import jax.numpy as np
 from jax import jit, random
 
 from lorax.nn import Module
-from lorax.nn.functional import (
-    ACTIVATIONS,
-    INITIALIZERS,
-    ActivationEnum,
-    InitializerEnum,
-)
-from lorax.parameter import Parameter
-from lorax.rng import RNG
+from lorax.nn.functional import ACTIVATIONS, ActivationEnum, InitializerEnum
+from lorax.parameter import Parameter, ParamInit
+
+# from lorax.rng import RNG
 from lorax.tensor import Tensor
 
 
@@ -39,24 +35,20 @@ class Linear(Module):
     def forward(self, inputs: Tensor) -> Tensor:
         """outputs = self.activation(inputs * self.w + self.b)"""
 
-        return ACTIVATIONS[self.activation](inputs @ self.w.value + self.b.value)
+        return ACTIVATIONS[self.activation](inputs @ self.w + self.b)
 
     @classmethod
-    def initialize(
+    def build(
         cls,
         input_dim: int,
         output_dim: int,
-        rng: RNG,
         activation: ActivationEnum = ActivationEnum.identity,
         initializer: InitializerEnum = InitializerEnum.normal,
     ) -> Linear:
         """Factory for new Linear from input and output dimensions"""
-        w = Parameter.from_tensor(
-            INITIALIZERS[initializer](rng.to_prng(), shape=(input_dim, output_dim))
-        )
         return cls(
-            w=w,
-            b=Parameter.from_tensor(np.zeros(shape=(output_dim,))),
+            w=ParamInit(shape=(input_dim, output_dim), initializer=initializer),
+            b=ParamInit(shape=(output_dim,), initializer=InitializerEnum.zeros),
             activation=activation,
         )
 
@@ -65,7 +57,7 @@ class Dropout(Module):
     """Dropout Layer. If in train mode, keeps input activations at given probability rate,
     otherwise returns inputs directly"""
 
-    rng: RNG
+    rng: Optional[Tensor] = None
     keep: float = 0.5
     mode: Mode = Mode.train
 
@@ -76,15 +68,12 @@ class Dropout(Module):
 
         if self.mode == Mode.eval:
             return inputs
-        rng_key = self.rng.to_prng()
-        mask = random.bernoulli(rng_key, self.keep, inputs.shape)  # type: ignore
+
+        mask = random.bernoulli(self._rng, self.keep, inputs.shape)  # type: ignore
         return np.where(mask, inputs / self.keep, 0)
 
-    def to_eval(self) -> Dropout:
-        return Dropout(rng=self.rng, keep=self.keep, mode=Mode.eval)
-
-    def to_train(self) -> Dropout:
-        return Dropout(rng=self.rng.split(num=1)[0], keep=self.keep, mode=Mode.train)
+    def initialize(self, rng: Tensor) -> Dropout:
+        return self.update(**{"is_initialized": True, "rng": rng})
 
 
 class Sequential(Module):
@@ -106,7 +95,7 @@ class Sequential(Module):
     def build(cls, *args: Module) -> Sequential:
         return Sequential(__root__=args)
 
-    def new_state(self, rng: Tensor, mode: str = "train") -> Module:
+    def new_state(self, rng: Tensor, mode: str = "train") -> Sequential:
         d: Dict[str, Any] = {"mode": mode}
         rngs = random.split(rng, len(self.__root__))
 

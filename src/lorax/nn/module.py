@@ -7,16 +7,16 @@ from __future__ import annotations
 import pickle
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Dict, List, Tuple, Type, TypeVar, Union
+from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
 
 import jax.numpy as np
 from jax import jit, random
 from jax.tree_util import register_pytree_node
 from numpy import ndarray
-from pydantic import BaseModel
+from pydantic import BaseModel, PrivateAttr
 from pydantic.utils import deep_update
 
-from lorax.parameter import Parameter
+from lorax.parameter import Parameter, ParamInit
 from lorax.tensor import Tensor
 
 __all__ = ["Module"]
@@ -27,6 +27,9 @@ suffix = ".pkl"
 
 
 class Module(BaseModel, ABC):
+    _is_initialized: bool = False
+    # _rng: Optional[Tensor] = PrivateAttr(False)
+
     class Config:
         allow_mutation = False
         json_encoders = {
@@ -43,7 +46,7 @@ class Module(BaseModel, ABC):
         cls._params = [
             field
             for field, kind in cls.__fields__.items()
-            if kind.name != "__root__" and issubclass(kind.type_, Parameter)
+            if kind.name != "__root__" and kind.type_ == Parameter
         ]
 
         cls._children = [
@@ -60,14 +63,18 @@ class Module(BaseModel, ABC):
         ]
         return super().__new__(cls)
 
+    # def __init__(self, **data: Any) -> None:
+    #     super().__init__(**data)
+    #     if "_rng" in data:
+    #         self._rng = data["_rng"]
+    #     if "_is_initialized" in data:
+    #         self._is_initialized = data["_is_initialized"]
+
     def json(self, *args: Any, **kwargs: Any) -> str:
         return super().json(indent=4)
 
     def dict(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
-        return {
-            **super().dict(),
-            "type": self.__class__.__name__,
-        }
+        return {"type": self.__class__.__name__, **super().dict()}
 
     def __repr__(self) -> str:
         return self.json()
@@ -105,20 +112,47 @@ class Module(BaseModel, ABC):
 
     @jit
     def __call__(self, inputs: Tensor) -> Tensor:
-        return self.forward(inputs)
+        if self.is_initialized:
+            return self.forward(inputs)
+        raise ValueError("Module has not been initialized!")
 
-    def update(self, update_dict: Dict[str, Any]) -> Module:
-        new_dict = deep_update(self.dict(), update_dict)
+    def update(self: T, **kwargs: Any) -> T:
+        new_dict = deep_update(self.dict(), kwargs)
         return self.__class__(**new_dict)
 
-    def new_state(self, rng: Tensor, mode: str = "train") -> Module:
-        d = {"mode": mode}
-        rngs = random.split(rng, len(self._children))
-
-        for m, rng in zip(self._children, rngs):
-            new_m = getattr(self, m).new_state(rng, mode)
+    def new_state(self: T, mode: str = "train") -> T:
+        d: Dict[str, Any] = {"mode": mode}
+        for m in self._children:
+            new_m = getattr(self, m).new_state(mode)
             d[m] = new_m
-        return self.update(d)
+        return self.update(**d)
+
+    def initialize(self: T, rng: Tensor) -> T:
+        d: Dict[str, Any] = {"rng": rng, "_is_initialized": True}
+        rng_p, rng_m = random.split(rng)
+        rngs = random.split(rng_p, len(self._params))
+        for name, rng in zip(self._params, rngs):
+            p = getattr(self, name)
+            if isinstance(p, ParamInit):
+                d |= {name: p.instantiate(rng)}
+
+        rngs = random.split(rng_m, len(self._children))
+        for name, rng in zip(self._children, rngs):
+            m = getattr(self, name)
+            if not m._is_initialized:
+                d |= {name: m.initialize(rng)}
+
+        return self.update(**d)
+
+    def to_train(self) -> T:
+        if not self.is_initialized:
+            raise ValueError("Module has not been initialized!")
+        return self.new_state(mode="train")
+
+    def to_eval(self) -> T:
+        if not self._is_initialized:
+            raise ValueError("Module has not been initialized!")
+        return self.new_state(mode="eval")
 
     def save(self, path: Union[str, Path], overwrite: bool = False) -> None:
         path = Path(path)

@@ -1,14 +1,18 @@
-from typing import Any, Dict, Sequence, Tuple
+from __future__ import annotations
+
+from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
 
 from jax.tree_util import register_pytree_node
 from pydantic import BaseModel
 
+from lorax.nn.functional import INITIALIZERS, InitializerEnum
 from lorax.tensor import Tensor
 
 
-class Parameter(BaseModel):
+class ParamInit(BaseModel):
 
-    __root__: Tensor
+    shape: Tuple[int, int]
+    initializer: InitializerEnum = InitializerEnum.normal
 
     class Config:
         allow_mutation = False
@@ -20,26 +24,20 @@ class Parameter(BaseModel):
         }
 
     def __repr__(self) -> str:
-        return f"Parameter shape={self.__root__.shape}"
+        return f"Parameter shape={self.shape}"
 
     def __str__(self) -> str:
         return self.json()
 
-    @property
-    def value(self) -> Tensor:
-        return self.__root__
-
-    @classmethod
-    def from_tensor(cls, tensor: Tensor) -> "Parameter":
-        return cls(__root__=tensor)
-
-
-def _tree_flatten(param: Parameter) -> Tuple[Tuple[Tensor], None]:
-    return (param.__root__,), None
+    def instantiate(
+        self,
+        rng: Tensor,
+        initializer: Callable[..., Tensor] = None,
+    ) -> Tensor:
+        """Returns a tensor created according to this init."""
+        if initializer is not None:
+            return initializer(key=rng, shape=self.shape)
+        return INITIALIZERS[self.initializer](key=rng, shape=self.shape)
 
 
-def _tree_unflatten(aux: Any, params: Sequence[Tensor]) -> Parameter:
-    return Parameter.construct(__root__=params[0])
-
-
-register_pytree_node(Parameter, _tree_flatten, _tree_unflatten)
+Parameter = Union[Tensor, ParamInit]

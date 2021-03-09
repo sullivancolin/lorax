@@ -4,6 +4,7 @@ from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 
 import jax.numpy as np
 import wandb
+from jax import jit, random
 from jax.tree_util import tree_flatten
 from pydantic import BaseModel
 
@@ -21,11 +22,15 @@ from lorax.loss import (
     LossEnum,
     RegularizationEnum,
 )
-from lorax.metrics import accuracy
-from lorax.models import Model
+from lorax.nn import Module
+from lorax.nn import functional as F
 from lorax.optim import OPTIMIZERS, Optimizer, OptimizerEnum
-from lorax.rng import RNG
 from lorax.tensor import Tensor
+
+
+@jit
+def accuracy(actual: Tensor, predicted: Tensor) -> float:
+    return np.mean(np.argmax(actual, axis=1) == np.argmax(predicted, axis=1))
 
 
 def wandb_log(d: Dict[str, Any], step: int) -> None:
@@ -50,7 +55,7 @@ def wandb_save(filename: str) -> None:
         pass
 
 
-def log_grads(grads: Model, step: int) -> None:
+def log_grads(grads: Module, step: int) -> None:
     params, _ = tree_flatten(grads)
     layer_names = grads.get_layer_names()
     if len(layer_names) != len(set(layer_names)):
@@ -75,7 +80,7 @@ def log_grads(grads: Model, step: int) -> None:
             )
 
 
-def log_params(model: Model, step: int) -> None:
+def log_params(model: Module, step: int) -> None:
     params, _ = tree_flatten(model)
     layer_names = params.get_layer_names()
     if len(layer_names) != len(set(layer_names)):
@@ -106,7 +111,7 @@ class UpdateState(BaseModel):
 
     step: int
     loss: float
-    model: Model
+    model: Module
 
 
 class Experiment(BaseModel):
@@ -156,13 +161,13 @@ class Experiment(BaseModel):
 
         return cls(**config)
 
-    def split_rng(self, num: int = 2) -> Tuple[RNG, ...]:
+    def split_rng(self, num: int = 2) -> Tuple[Tensor, ...]:
         if getattr(self, "rng", None) is None:
-            self.rng: RNG = RNG.from_seed(self.random_seed)
+            self.rng: Tensor = random.PRNGKey(self.random_seed)
         rngs = self.rng.split(num=num)
         return rngs
 
-    def create_model(self) -> Model:
+    def create_model(self) -> Module:
         self.rng, new_rng = self.split_rng()
         return self.model_config.initialize(new_rng)
 
@@ -173,7 +178,7 @@ class Experiment(BaseModel):
             loss = LOSS_FUNCTIONS[self.loss]
         return loss
 
-    def create_optimizer(self, model: Model, loss: Loss) -> Optimizer:
+    def create_optimizer(self, model: Module, loss: Loss) -> Optimizer:
         optimizer_class = OPTIMIZERS[self.optimizer]
         return optimizer_class.initialize(model, loss, self.learning_rate)
 
@@ -216,7 +221,7 @@ class Experiment(BaseModel):
 
     def do_eval(
         self,
-        model: Model,
+        model: Module,
         loss: Loss,
         test_iterator: DataIterator,
         step: int,
@@ -230,7 +235,7 @@ class Experiment(BaseModel):
             test_loss = loss(model, test_batch.inputs, test_batch.targets)
             test_label_accumulator.append(test_batch.targets)
             test_loss_accumulator += test_loss
-            test_pred_accumulator.append(model.predict_proba(test_batch.inputs))
+            test_pred_accumulator.append(F.softmax(model(test_batch.inputs)))
 
         test_probs = np.vstack(test_pred_accumulator)
         test_labels = np.vstack(test_label_accumulator)
