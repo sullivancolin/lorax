@@ -36,11 +36,11 @@ lint: clean
 
 ## run tests with the default Python
 test: lint
-	poetry run pytest -vv --cov=src
+	poetry run pytest -vv --cov=lorax -p no:warnings
 
 ## check code coverage quickly with the default Python
 coverage: clean
-	poetry run pytest  -vv --cov=src --cov-report html --cov-report term --cov-context=test
+	poetry run pytest  -vv --cov=lorax --cov-report html --cov-report term --cov-context=test -p no:warnings
 	open -a "Firefox" htmlcov/index.html
 
 ## increment the patch version, and tag in git

@@ -8,6 +8,7 @@ from jax import jit, lax, nn, ops
 from lorax.nn import Module
 from lorax.nn.functional import InitializerEnum
 from lorax.parameter import Parameter, ParamInit
+from lorax.rng import RNG
 from lorax.tensor import Tensor
 
 
@@ -29,11 +30,11 @@ class Embedding(Module):
         vectors = ParamInit(shape=(vocab_size, hidden_dim))
         return cls(embedding_matrix=vectors)
 
-    def initialize(self, rng: Tensor) -> Embedding:
+    def initialize(self, rng: RNG) -> Embedding:
         embedding = super().initialize(rng)
         vectors = embedding.embedding_matrix
         vectors = ops.index_update(vectors, ops.index[0, :], 0.0)
-        return self.update(embedding_matrix=vectors)
+        return self.update(embedding_matrix=vectors, _rng=embedding._rng)
 
 
 class LSTM(Module):

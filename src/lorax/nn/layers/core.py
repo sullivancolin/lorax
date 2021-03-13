@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Dict, Iterator, Optional, Tuple
+from typing import Any, Dict, Iterator, Tuple
 
 import jax.numpy as np
 from jax import jit, random
@@ -11,8 +11,7 @@ from jax import jit, random
 from lorax.nn import Module
 from lorax.nn.functional import ACTIVATIONS, ActivationEnum, InitializerEnum
 from lorax.parameter import Parameter, ParamInit
-
-# from lorax.rng import RNG
+from lorax.rng import RNG
 from lorax.tensor import Tensor
 
 
@@ -57,7 +56,6 @@ class Dropout(Module):
     """Dropout Layer. If in train mode, keeps input activations at given probability rate,
     otherwise returns inputs directly"""
 
-    rng: Optional[Tensor] = None
     keep: float = 0.5
     mode: Mode = Mode.train
 
@@ -69,11 +67,11 @@ class Dropout(Module):
         if self.mode == Mode.eval:
             return inputs
 
-        mask = random.bernoulli(self._rng, self.keep, inputs.shape)  # type: ignore
+        mask = random.bernoulli(self._rng.to_prng(), self.keep, inputs.shape)  # type: ignore
         return np.where(mask, inputs / self.keep, 0)
 
-    def initialize(self, rng: Tensor) -> Dropout:
-        return self.update(**{"is_initialized": True, "rng": rng})
+    def initialize(self, rng: RNG) -> Dropout:
+        return self.update(**{"_rng": rng})
 
 
 class Sequential(Module):
@@ -95,18 +93,35 @@ class Sequential(Module):
     def build(cls, *args: Module) -> Sequential:
         return Sequential(__root__=args)
 
-    def new_state(self, rng: Tensor, mode: str = "train") -> Sequential:
-        d: Dict[str, Any] = {"mode": mode}
-        rngs = random.split(rng, len(self.__root__))
-
-        new_tup = tuple(
-            mod.new_state(rng, mode) for rng, mod in zip(rngs, self.__root__)
-        )
+    def new_state(self, mode: str = "train") -> Sequential:
+        d: Dict[str, Any] = {"mode": mode, "_rng": self._rng}
+        if isinstance(self._rng, RNG) and mode == "train":
+            new_rng, rng = self._rng.split()
+            d["_rng"] = new_rng
+        new_tup = tuple(mod.new_state(mode) for mod in self.__root__)
         d["__root__"] = new_tup
-        return self.copy(update=d)
+        return self.update(**d)
+
+    def initialize(self, rng: RNG) -> Sequential:
+        rng, new_rng = rng.split()
+        d: Dict[str, Any] = {"_rng": new_rng}
+        rng_p, rng_m = rng.split()
+        rngs = rng_p.split(len(self._params))
+        for name, rng in zip(self._params, rngs):
+            p = getattr(self, name)
+            if isinstance(p, ParamInit):
+                d |= {name: p.instantiate(rng)}
+
+        rngs = rng_m.split(len(self.__root__))
+        new_root = []
+        for m, rng in zip(self.__root__, rngs):
+            if m._rng is not None:
+                new_root.append(m.initialize(rng))
+        d["__root__"] = tuple(new_root)
+        return self.update(**d)
 
     @jit
     def forward(self, inputs: Tensor) -> Tensor:
-        for module in self:
+        for module in self.__root__:
             inputs = module(inputs)
         return inputs

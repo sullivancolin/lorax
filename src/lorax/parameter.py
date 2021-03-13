@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, Tuple, Union
 
-from jax.tree_util import register_pytree_node
 from pydantic import BaseModel
 
 from lorax.nn.functional import INITIALIZERS, InitializerEnum
+from lorax.rng import RNG
 from lorax.tensor import Tensor
 
 
@@ -31,13 +31,13 @@ class ParamInit(BaseModel):
 
     def instantiate(
         self,
-        rng: Tensor,
+        rng: RNG,
         initializer: Callable[..., Tensor] = None,
     ) -> Tensor:
         """Returns a tensor created according to this init."""
         if initializer is not None:
-            return initializer(key=rng, shape=self.shape)
-        return INITIALIZERS[self.initializer](key=rng, shape=self.shape)
+            return initializer(key=rng.to_prng(), shape=self.shape)
+        return INITIALIZERS[self.initializer](key=rng.to_prng(), shape=self.shape)
 
 
 Parameter = Union[Tensor, ParamInit]

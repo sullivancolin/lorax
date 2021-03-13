@@ -19,3 +19,23 @@ from lorax.nn.functional.initializers import (
     normal,
     xavier_normal,
 )
+
+__all__ = [
+    "ACTIVATIONS",
+    "ActivationEnum",
+    "identity",
+    "leaky_relu",
+    "log_softmax",
+    "mish",
+    "relu",
+    "selu",
+    "sigmoid",
+    "softmax",
+    "softplus",
+    "tanh",
+    "INITIALIZERS",
+    "InitializerEnum",
+    "lecun_normal",
+    "normal",
+    "xavier_normal",
+]

@@ -1,6 +1,6 @@
 import json
 from collections import Counter
-from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
+from typing import Any, Dict, Iterator, Optional, Tuple, Union
 
 import jax.numpy as np
 import wandb
