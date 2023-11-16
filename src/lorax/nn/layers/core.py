@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Dict, Iterator, Tuple
+from typing import Any, Dict, Iterator, Tuple, Optional
 
 import jax.numpy as np
 from jax import jit, random
@@ -58,6 +58,7 @@ class Dropout(Module):
 
     keep: float = 0.5
     mode: Mode = Mode.train
+    rng: Optional[RNG] = None
 
     @jit
     def forward(self, inputs: Tensor) -> Tensor:
@@ -67,11 +68,12 @@ class Dropout(Module):
         if self.mode == Mode.eval:
             return inputs
 
-        mask = random.bernoulli(self._rng.to_prng(), self.keep, inputs.shape)  # type: ignore
+        mask = random.bernoulli(self.rng.to_prng(), self.keep, inputs.shape)  # type: ignore
         return np.where(mask, inputs / self.keep, 0)
 
-    def initialize(self, rng: RNG) -> Dropout:
-        return self.update(**{"_rng": rng})
+    @classmethod
+    def build(cls, keep: float, mode: Mode) -> Dropout:
+        return cls(keep=keep, mode=mode)
 
 
 class Sequential(Module):
@@ -84,23 +86,20 @@ class Sequential(Module):
         for mod in self.__root__:
             yield mod
 
-    def add(self, module: Module) -> Sequential:
+    def add(self, *module: Module) -> Sequential:
         d = self.__root__
-        new_tup = list(d) + [module]
-        return Sequential(__root__=tuple(new_tup))
+        new_tup = d + module
+        return Sequential(__root__=new_tup)
 
     @classmethod
     def build(cls, *args: Module) -> Sequential:
         return Sequential(__root__=args)
 
-    def new_state(self, mode: str = "train") -> Sequential:
-        d: Dict[str, Any] = {"mode": mode, "_rng": self._rng}
-        if isinstance(self._rng, RNG) and mode == "train":
-            new_rng, rng = self._rng.split()
-            d["_rng"] = new_rng
-        new_tup = tuple(mod.new_state(mode) for mod in self.__root__)
+    def new_state(self, **kwargs: Any) -> Sequential:
+        d: Dict[str, Any] = {}
+        new_tup = tuple(module.new_state(**kwargs) for module in self.__root__)
         d["__root__"] = new_tup
-        return self.update(**d)
+        return self.update(__root__=new_tup)
 
     def initialize(self, rng: RNG) -> Sequential:
         rng, new_rng = rng.split()

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Tuple
 
 import jax.numpy as np
-from jax import jit, lax, nn, ops
+from jax import jit, lax, nn, ops, vmap
 
 from lorax.nn import Module
 from lorax.nn.functional import InitializerEnum
@@ -50,11 +50,11 @@ class LSTM(Module):
     def build(cls, input_dim: int, hidden_dim: int) -> "LSTM":
 
         U = ParamInit(
-            shape=(4 * hidden_dim, input_dim), initializer=InitializerEnum.xavier_normal
+            shape=(input_dim, 4 * hidden_dim), initializer=InitializerEnum.xavier_normal
         )
 
         V = ParamInit(
-            shape=(4 * hidden_dim, hidden_dim),
+            shape=(hidden_dim, 4 * hidden_dim),
             initializer=InitializerEnum.xavier_normal,
         )
 
@@ -70,7 +70,7 @@ class LSTM(Module):
         return cls(
             U=U,
             V=V,
-            b=U,
+            b=b,
             h_prev=h_prev,
             c_prev=c_prev,
         )
@@ -82,9 +82,9 @@ class LSTM(Module):
 
         h_prev, c_prev = state
 
-        igof = self.U @ embedding + self.V @ h_prev + self.b
+        igof = embedding @ self.U + h_prev @ self.V + self.b
 
-        i, g, o, f = np.split(igof, 4, axis=1)
+        i, g, o, f = np.split(igof, 4, axis=-1)
 
         i = nn.sigmoid(i)
         o = nn.sigmoid(o)
@@ -97,7 +97,7 @@ class LSTM(Module):
         return (h_new, c_new), h_new
 
     @jit
-    def forward(self, sequence_embedding: Tensor) -> Tensor:
+    def single_forward(self, sequence_embedding: Tensor) -> Tensor:
         h_prev = self.h_prev
         c_prev = self.c_prev
 
@@ -118,6 +118,9 @@ class LSTM(Module):
         # return (h_new, c_new), outputs
 
         return output_sequence
+
+    def forward(self, inputs: Tensor) -> Tensor:
+        return vmap(self.single_forward)(inputs)
 
 
 class BiLSTM(Module):

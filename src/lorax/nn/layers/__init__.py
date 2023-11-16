@@ -9,4 +9,5 @@ __all__ = [
     "BiLSTM",
     "Mode",
     "Sequential",
+    "Mode",
 ]

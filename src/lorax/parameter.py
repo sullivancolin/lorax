@@ -11,7 +11,7 @@ from lorax.tensor import Tensor
 
 class ParamInit(BaseModel):
 
-    shape: Tuple[int, int]
+    shape: Tuple[int, ...]
     initializer: InitializerEnum = InitializerEnum.normal
 
     class Config:
@@ -29,7 +29,7 @@ class ParamInit(BaseModel):
     def __str__(self) -> str:
         return self.json()
 
-    def instantiate(
+    def init(
         self,
         rng: RNG,
         initializer: Callable[..., Tensor] = None,

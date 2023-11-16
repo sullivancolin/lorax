@@ -30,7 +30,7 @@ class Optimizer(BaseModel, ABC):
 
     @classmethod
     @abstractmethod
-    def initialize(cls: Type[T], net: Module, loss: Loss, lr: float = 0.01) -> T:
+    def initialize(cls: Type[T], model: Module, loss: Loss, lr: float = 0.01) -> T:
         raise NotImplementedError
 
 
@@ -59,8 +59,8 @@ class SGD(Optimizer):
         loss, self.grads = self.value_grad_func(self.model, inputs, targets)
 
         combiner = partial(sgd_update_combiner, lr=self.learning_rate)
-        self.module = tree_multimap(combiner, self.model, self.grads)
-        return loss, self.module
+        self.model = tree_multimap(combiner, self.model, self.grads)
+        return loss, self.model
 
 
 class Adam(Optimizer):
@@ -90,8 +90,8 @@ class Adam(Optimizer):
         )
 
     def step(self, inputs: Tensor, targets: Tensor) -> Tuple[float, Module]:
-        self.module = self.get_params(self.opt_state)
-        loss, self.grads = self.value_grad_func(self.module, inputs, targets)
+        self.model = self.get_params(self.opt_state)
+        loss, self.grads = self.value_grad_func(self.model, inputs, targets)
         self.opt_state = self.update_func(self.update_count, self.grads, self.opt_state)
         self.update_count += 1
         return loss, self.get_params(self.opt_state)

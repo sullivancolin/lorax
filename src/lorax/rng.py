@@ -16,9 +16,8 @@ class RNG(BaseModel):
     int_1: int
     int_2: int
 
-    # def __init_subclass__(cls, **kwargs: Any) -> None:
-    #     super().__init_subclass__(**kwargs)  # type: ignore
-    #     register_pytree_node(cls, cls._flatten_rng, cls._unflatten_rng)
+    class Config:
+        allow_mutation = False
 
     def to_prng(self) -> Tensor:
         return np.array([self.int_1, self.int_2], dtype=np.uint32)
@@ -50,10 +49,3 @@ class RNG(BaseModel):
 
     def __hash__(self) -> int:
         return hash((self.int_1, self.int_2))
-
-    # def _flatten_rng(self) -> Tuple[None, Tuple[int, int]]:
-    #     return None, (self.int_1, self.int_2)
-
-    # @classmethod
-    # def _unflatten_rng(cls: Type[T], aux: Tuple[int, int], params: Any) -> T:
-    #     return cls.construct(int_1=aux[0], int_2=aux[1])
